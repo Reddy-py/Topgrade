@@ -12,8 +12,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  type NewType = React.FormEvent;
-
+type NewType = React.BaseSyntheticEvent;
   const handleSubmit = async (e: NewType) => {
     e.preventDefault();
     setErrorMessage(null);
