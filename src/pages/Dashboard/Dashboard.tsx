@@ -7,7 +7,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     // Request metadata from our local Node server
-    fetch("http://localhost:5000/api/crm-info")
+    fetch("https://topgrade-backend.onrender.com/api/crm-info")
       .then((res) => res.json())
       .then((data) => setBackendData(data))
       .catch((err) => console.error("Error connecting to Render backend:", err));
