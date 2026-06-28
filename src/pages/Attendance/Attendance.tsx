@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { 
   FaCheckCircle, 
   FaTimesCircle, 
@@ -9,43 +9,121 @@ import {
   FaChevronLeft, 
   FaChevronRight 
 } from "react-icons/fa";
+import { supabase } from "../../utils/supabaseClient";
 
 interface StudentAttendance {
-  id: string;
+  id: string; // internal primary database UUID
+  studentId: string; // e.g. #STU-8821
   name: string;
   email: string;
-  studentId: string;
   section: string;
   time: string;
   status: "present" | "absent" | "late";
   avatar: string;
 }
 
-const initialStudents: StudentAttendance[] = [
-  { id: "1", name: "Elena Rodriguez", email: "elena.r@topgrade.edu", studentId: "#STU-8821", section: "Mathematics II-A", time: "08:05 AM", status: "present", avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=100" },
-  { id: "2", name: "Marcus Chen", email: "m.chen@topgrade.edu", studentId: "#STU-4512", section: "Mathematics II-A", time: "--:--", status: "absent", avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=100" },
-  { id: "3", name: "Julian Vance", email: "j.vance@topgrade.edu", studentId: "#STU-9903", section: "Mathematics II-A", time: "08:14 AM", status: "late", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=100" },
-  { id: "4", name: "Sarah Kim", email: "s.kim@topgrade.edu", studentId: "#STU-1267", section: "Mathematics II-A", time: "07:55 AM", status: "present", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=100" },
-  { id: "5", name: "David Okafor", email: "d.okafor@topgrade.edu", studentId: "#STU-7734", section: "Mathematics II-A", time: "08:02 AM", status: "present", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=100" }
-];
-
 export default function Attendance() {
-  const [students, setStudents] = useState<StudentAttendance[]>(initialStudents);
+  const [students, setStudents] = useState<StudentAttendance[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState("Mathematics II");
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleStatusChange = (id: string, newStatus: "present" | "absent" | "late") => {
-    setStudents(prev => prev.map(student => {
-      if (student.id === id) {
-        let updatedTime = student.time;
-        if (newStatus === "present" || newStatus === "late") {
-          updatedTime = student.time === "--:--" ? "08:00 AM" : student.time;
-        } else {
-          updatedTime = "--:--";
-        }
-        return { ...student, status: newStatus, time: updatedTime };
-      }
-      return student;
-    }));
+  // Constants fixed for historical consistency matching layout designs
+  const targetDateISO = "2026-06-26";
+  const formattedDisplayDate = "June 26, 2026";
+
+  useEffect(() => {
+    fetchAttendance();
+  }, [selectedCourse]);
+
+  const fetchAttendance = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("attendance_records")
+        .select("*")
+        .eq("course_name", selectedCourse)
+        .eq("record_date", targetDateISO);
+
+      if (error) throw error;
+
+      const mapped: StudentAttendance[] = (data || []).map((row) => ({
+        id: row.id,
+        studentId: row.student_id,
+        name: row.student_name,
+        email: row.student_email,
+        section: row.course_name + "-A",
+        time: row.check_in_time,
+        status: row.status as "present" | "absent" | "late",
+        avatar: row.avatar_url
+      }));
+
+      setStudents(mapped);
+    } catch (err) {
+      console.error("Error connecting with the cloud data tables:", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  // Update Status directly on DB rows
+  const handleStatusChange = async (id: string, newStatus: "present" | "absent" | "late") => {
+    const targetStudent = students.find(s => s.id === id);
+    if (!targetStudent) return;
+
+    let updatedTime = targetStudent.time;
+    if (newStatus === "present" || newStatus === "late") {
+      updatedTime = targetStudent.time === "--:--" ? "08:00 AM" : targetStudent.time;
+    } else {
+      updatedTime = "--:--";
+    }
+
+    // Pessimistic client state render layout updates
+    try {
+      const { error } = await supabase
+        .from("attendance_records")
+        .update({ status: newStatus, check_in_time: updatedTime })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setStudents(prev => prev.map(s => s.id === id ? { ...s, status: newStatus, time: updatedTime } : s));
+    } catch (err) {
+      alert("Cloud write operations failed. Reverting data state adjustments.");
+    }
+  };
+
+  // Bulk Operations Utility Routine
+  const handleBulkPresent = async () => {
+    if (students.length === 0) return;
+    try {
+      const { error } = await supabase
+        .from("attendance_records")
+        .update({ status: "present", check_in_time: "08:00 AM" })
+        .eq("course_name", selectedCourse)
+        .eq("record_date", targetDateISO);
+
+      if (error) throw error;
+      
+      setStudents(prev => prev.map(s => ({ ...s, status: "present", time: "08:00 AM" })));
+    } catch (err) {
+      alert("Failed to sign off batch processing pipelines.");
+    }
+  };
+
+  // Live Aggregation Matrix Calculations 
+  const stats = useMemo(() => {
+    const total = students.length;
+    if (total === 0) return { present: 0, absent: 0, late: 0, rate: "0.0" };
+
+    const present = students.filter(s => s.status === "present").length;
+    const late = students.filter(s => s.status === "late").length;
+    const absent = students.filter(s => s.status === "absent").length;
+    
+    // Attendance rate = (Present + Late) / Total
+    const rate = (((present + late) / total) * 100).toFixed(1);
+
+    return { present, absent, late, rate };
+  }, [students]);
 
   return (
     <div className="p-1 max-w-[1440px] mx-auto space-y-6">
@@ -58,7 +136,7 @@ export default function Attendance() {
         </div>
         <div className="inline-flex items-center gap-2 bg-[#2563eb]/10 px-4 py-1.5 rounded-full border border-[#004ac6]/20">
           <span className="w-2 h-2 rounded-full bg-[#004ac6] animate-pulse"></span>
-          <span className="text-xs font-bold text-[#004ac6]">Today's Rate: 94.2%</span>
+          <span className="text-xs font-bold text-[#004ac6]">Today's Rate: {stats.rate}%</span>
         </div>
       </header>
 
@@ -70,7 +148,7 @@ export default function Attendance() {
           </div>
           <div>
             <p className="text-[10px] font-bold text-[#434655] uppercase tracking-wider">Present</p>
-            <p className="text-2xl font-black text-[#0d1c2f]">2,308</p>
+            <p className="text-2xl font-black text-[#0d1c2f]">{isLoading ? "..." : stats.present}</p>
           </div>
         </div>
 
@@ -80,7 +158,7 @@ export default function Attendance() {
           </div>
           <div>
             <p className="text-[10px] font-bold text-[#434655] uppercase tracking-wider">Absent</p>
-            <p className="text-2xl font-black text-[#0d1c2f]">142</p>
+            <p className="text-2xl font-black text-[#0d1c2f]"> {isLoading ? "..." : stats.absent}</p>
           </div>
         </div>
 
@@ -90,7 +168,7 @@ export default function Attendance() {
           </div>
           <div>
             <p className="text-[10px] font-bold text-[#434655] uppercase tracking-wider">Tardy</p>
-            <p className="text-2xl font-black text-[#0d1c2f]">32</p>
+            <p className="text-2xl font-black text-[#0d1c2f]">{isLoading ? "..." : stats.late}</p>
           </div>
         </div>
       </section>
@@ -101,22 +179,29 @@ export default function Attendance() {
           <div className="relative">
             <FaCalendarAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-[#737686]" />
             <input 
-              className="pl-9 pr-4 py-2 bg-white border border-[#c3c6d7] rounded-xl text-xs font-bold text-[#434655] focus:outline-none focus:ring-2 focus:ring-[#004ac6]/20" 
+              className="pl-9 pr-4 py-2 bg-white border border-[#c3c6d7] rounded-xl text-xs font-bold text-[#434655] focus:outline-none selection:bg-transparent cursor-default" 
               type="text" 
               readOnly 
-              value="June 26, 2026"
+              value={formattedDisplayDate}
             />
           </div>
           <div className="relative min-w-[180px]">
-            <select className="w-full appearance-none pl-3 pr-10 py-2 bg-white border border-[#c3c6d7] rounded-xl text-xs font-bold text-[#434655] focus:outline-none cursor-pointer">
-              <option>Mathematics II</option>
-              <option>Advanced Physics</option>
-              <option>Organic Chemistry</option>
+            <select 
+              value={selectedCourse}
+              onChange={(e) => setSelectedCourse(e.target.value)}
+              className="w-full appearance-none pl-3 pr-10 py-2 bg-white border border-[#c3c6d7] rounded-xl text-xs font-bold text-[#434655] focus:outline-none cursor-pointer"
+            >
+              <option value="Mathematics II">Mathematics II</option>
+              <option value="Advanced Physics">Advanced Physics</option>
+              <option value="Organic Chemistry">Organic Chemistry</option>
             </select>
-            <FaChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#737686] text-[10px]" />
+            <FaChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#737686] text-[10px] pointer-events-none" />
           </div>
         </div>
-        <button className="bg-[#004ac6] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md hover:bg-[#2563eb] active:scale-95 transition-all flex items-center justify-center gap-2">
+        <button 
+          onClick={handleBulkPresent}
+          className="bg-[#004ac6] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md hover:bg-[#2563eb] active:scale-95 transition-all flex items-center justify-center gap-2"
+        >
           <FaUserCheck />
           <span>Mark Bulk Attendance</span>
         </button>
@@ -136,66 +221,77 @@ export default function Attendance() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#c3c6d7]/20">
-              {students.map((student) => (
-                <tr key={student.id} className="hover:bg-[#f8f9ff] transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <img className="w-9 h-9 rounded-full object-cover border" src={student.avatar} alt={student.name} />
-                      <div>
-                        <p className="text-sm font-bold text-[#0d1c2f]">{student.name}</p>
-                        <p className="text-xs text-[#434655]/70">{student.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-xs font-semibold text-[#434655]">{student.studentId}</td>
-                  <td className="px-6 py-4 text-xs font-bold text-[#0d1c2f]">{student.section}</td>
-                  <td className="px-6 py-4 text-xs font-semibold text-[#434655]">{student.time}</td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="inline-flex gap-1.5 bg-[#eff4ff] p-1 rounded-xl border">
-                      <button 
-                        onClick={() => handleStatusChange(student.id, "present")}
-                        className={`p-1.5 rounded-lg text-sm transition-all ${
-                          student.status === "present" ? "bg-emerald-500 text-white shadow-sm" : "text-[#737686] hover:text-emerald-600"
-                        }`}
-                        title="Mark Present"
-                      >
-                        <FaCheckCircle />
-                      </button>
-                      <button 
-                        onClick={() => handleStatusChange(student.id, "absent")}
-                        className={`p-1.5 rounded-lg text-sm transition-all ${
-                          student.status === "absent" ? "bg-red-500 text-white shadow-sm" : "text-[#737686] hover:text-red-600"
-                        }`}
-                        title="Mark Absent"
-                      >
-                        <FaTimesCircle />
-                      </button>
-                      <button 
-                        onClick={() => handleStatusChange(student.id, "late")}
-                        className={`p-1.5 rounded-lg text-sm transition-all ${
-                          student.status === "late" ? "bg-amber-500 text-white shadow-sm" : "text-[#737686] hover:text-amber-500"
-                        }`}
-                        title="Mark Late"
-                      >
-                        <FaClock />
-                      </button>
-                    </div>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-12">
+                    <span className="w-8 h-8 border-4 border-[#004ac6]/20 border-t-[#004ac6] inline-block rounded-full animate-spin" />
                   </td>
                 </tr>
-              ))}
+              ) : students.length > 0 ? (
+                students.map((student) => (
+                  <tr key={student.id} className="hover:bg-[#f8f9ff] transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <img className="w-9 h-9 rounded-full object-cover border" src={student.avatar} alt={student.name} />
+                        <div>
+                          <p className="text-sm font-bold text-[#0d1c2f]">{student.name}</p>
+                          <p className="text-xs text-[#434655]/70">{student.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-xs font-semibold text-[#434655]">{student.studentId}</td>
+                    <td className="px-6 py-4 text-xs font-bold text-[#0d1c2f]">{student.section}</td>
+                    <td className="px-6 py-4 text-xs font-semibold text-[#434655]">{student.time}</td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="inline-flex gap-1.5 bg-[#eff4ff] p-1 rounded-xl border">
+                        <button 
+                          onClick={() => handleStatusChange(student.id, "present")}
+                          className={`p-1.5 rounded-lg text-sm transition-all ${
+                            student.status === "present" ? "bg-emerald-500 text-white shadow-sm" : "text-[#737686] hover:text-emerald-600"
+                          }`}
+                          title="Mark Present"
+                        >
+                          <FaCheckCircle />
+                        </button>
+                        <button 
+                          onClick={() => handleStatusChange(student.id, "absent")}
+                          className={`p-1.5 rounded-lg text-sm transition-all ${
+                            student.status === "absent" ? "bg-red-500 text-white shadow-sm" : "text-[#737686] hover:text-red-600"
+                          }`}
+                          title="Mark Absent"
+                        >
+                          <FaTimesCircle />
+                        </button>
+                        <button 
+                          onClick={() => handleStatusChange(student.id, "late")}
+                          className={`p-1.5 rounded-lg text-sm transition-all ${
+                            student.status === "late" ? "bg-amber-500 text-white shadow-sm" : "text-[#737686] hover:text-amber-500"
+                          }`}
+                          title="Mark Late"
+                        >
+                          <FaClock />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="text-center py-12 text-xs font-bold text-[#434655]">No student records registered for this specific course session.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
 
         {/* Footer Navigation */}
         <div className="px-6 py-4 bg-[#eff4ff] flex items-center justify-between border-t border-[#c3c6d7]/30">
-          <span className="text-xs font-semibold text-[#434655]">Showing 5 of 32 Students</span>
+          <span className="text-xs font-semibold text-[#434655]">Showing {students.length} of {students.length} Students</span>
           <div className="flex items-center gap-1">
             <button className="p-1.5 rounded-xl border border-[#c3c6d7] text-[#737686] bg-white hover:bg-[#eff4ff]">
               <FaChevronLeft className="text-xs" />
             </button>
             <button className="w-8 h-8 rounded-xl bg-[#004ac6] text-white text-xs font-bold shadow-sm">1</button>
-            <button className="w-8 h-8 rounded-xl bg-white border border-[#c3c6d7] text-xs font-bold text-[#434655] hover:bg-[#eff4ff]">2</button>
             <button className="p-1.5 rounded-xl border border-[#c3c6d7] text-[#737686] bg-white hover:bg-[#eff4ff]">
               <FaChevronRight className="text-xs" />
             </button>
