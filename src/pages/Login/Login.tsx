@@ -1,12 +1,17 @@
 import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-// Initialize the client directly on the frontend using your public credentials
-const SUPABASE_URL = "https://zznzmzwiewsnmykcbcni.supabase.co"; // Replace with your actual project URL
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6bnptendpZXdzbm15a2NiY25pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0ODg5NDEsImV4cCI6MjA5ODA2NDk0MX0._fQr1yqqa7eeW0DBYy51rcComrRfLS-K0niuqDQNf9E"; // Replace with your actual public anon key
+const SUPABASE_URL = "https://zznzmzwiewsnmykcbcni.supabase.co"; 
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6bnptendpZXdzbm15a2NiY25pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0ODg5NDEsImV4cCI6MjA5ODA2NDk0MX0._fQr1yqqa7eeW0DBYy51rcComrRfLS-K0niuqDQNf9E"; 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-export default function ProfessionalLogin() {
+// 1. Define the props interface that App.tsx is expecting
+interface LoginProps {
+  onLoginSuccess?: () => void;
+}
+
+// 2. Accept the prop in the component arguments
+export default function ProfessionalLogin({ onLoginSuccess }: LoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -18,7 +23,6 @@ export default function ProfessionalLogin() {
     setErrorMessage("");
 
     try {
-      // 1. Authenticate user credentials against Supabase Auth Core
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -27,7 +31,6 @@ export default function ProfessionalLogin() {
       if (authError) throw authError;
       if (!authData.user) throw new Error("Authentication failed. No user found.");
 
-      // 2. Fetch the corresponding profile role data from our Phase 1 table
       const { data: profile, error: profileError } = await supabase
         .from("user_profiles")
         .select("role, full_name")
@@ -36,18 +39,22 @@ export default function ProfessionalLogin() {
 
       if (profileError) throw new Error("Failed to retrieve assigned organizational permissions.");
 
-      // 3. Store session metadata globally for route guard verification
       localStorage.setItem("topgrade_token", authData.session?.access_token || "");
       localStorage.setItem("topgrade_user_role", profile.role);
       localStorage.setItem("topgrade_user_name", profile.full_name);
 
-      // 4. Divert dashboard routing depending on exact access clearances
       console.log(`Successfully logged in as ${profile.full_name} (${profile.role})`);
       
-      if (profile.role === "accounts") {
-        window.location.href = "/billing";
+      // 3. Fire the success callback if it exists to let App.tsx know state has changed
+      if (onLoginSuccess) {
+        onLoginSuccess();
       } else {
-        window.location.href = "/dashboard";
+        // Fallback routing if App.tsx doesn't manage the global route state directly
+        if (profile.role === "accounts") {
+          window.location.href = "/billing";
+        } else {
+          window.location.href = "/dashboard";
+        }
       }
 
     } catch (err: any) {
@@ -56,6 +63,8 @@ export default function ProfessionalLogin() {
       setIsLoading(false);
     }
   };
+
+  // ... keep the rest of the return JSX exactly the same ...
 
   return (
     <div className="min-h-screen bg-[#f8f9ff] flex flex-col items-center justify-center p-4">
