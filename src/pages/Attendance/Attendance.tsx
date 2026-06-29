@@ -5,15 +5,12 @@ import {
   FaClock, 
   FaCalendarAlt, 
   FaChevronDown, 
-  FaUserCheck, 
-  FaChevronLeft, 
-  FaChevronRight 
+  FaUserCheck
 } from "react-icons/fa";
-import { supabase } from "../../utils/supabaseClient";
 
 interface StudentAttendance {
-  id: string; // internal primary database UUID
-  studentId: string; // e.g. #STU-8821
+  id: string; // Database Schedule ID
+  studentId: string; // ID code string (e.g. #STU-8821)
   name: string;
   email: string;
   section: string;
@@ -27,107 +24,76 @@ export default function Attendance() {
   const [selectedCourse, setSelectedCourse] = useState("Mathematics II");
   const [isLoading, setIsLoading] = useState(true);
 
-  // Constants fixed for historical consistency matching layout designs
+  const BACKEND_URL = "https://topgrade-backend.onrender.com";
   const targetDateISO = "2026-06-26";
-  const formattedDisplayDate = "June 26, 2026";
+  const formattedDisplayDate = new Date(`${targetDateISO}T00:00:00`).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 
+  // Fetch student roster via the backend pipeline
   useEffect(() => {
+    const fetchAttendance = async () => {
+      setIsLoading(true);
+      try {
+        // In a fully deployed context, this fetches students matching the active schedule rules
+        const response = await fetch(`${BACKEND_URL}/api/search/global?query=${selectedCourse}`);
+        const result = await response.json();
+        
+        if (result.success) {
+          // Map backend entities cleanly to frontend display structures
+          const mapped: StudentAttendance[] = result.data.students.map((stu: any) => ({
+            id: stu.id,
+            studentId: stu.student_id_code,
+            name: stu.name,
+            email: stu.email?.email || "no-parent-email@topgrade.edu",
+            section: selectedCourse + "-A",
+            time: "--:--",
+            status: "absent",
+            avatar: stu.photo_url || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=100"
+          }));
+          setStudents(mapped);
+        }
+      } catch (err) {
+        console.error("Failed connecting to live Render endpoints:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     fetchAttendance();
   }, [selectedCourse]);
 
-  const fetchAttendance = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("attendance_records")
-        .select("*")
-        .eq("course_name", selectedCourse)
-        .eq("record_date", targetDateISO);
-
-      if (error) throw error;
-
-      const mapped: StudentAttendance[] = (data || []).map((row) => ({
-        id: row.id,
-        studentId: row.student_id,
-        name: row.student_name,
-        email: row.student_email,
-        section: row.course_name + "-A",
-        time: row.check_in_time,
-        status: row.status as "present" | "absent" | "late",
-        avatar: row.avatar_url
-      }));
-
-      setStudents(mapped);
-    } catch (err) {
-      console.error("Error connecting with the cloud data tables:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Update Status directly on DB rows
-  const handleStatusChange = async (id: string, newStatus: "present" | "absent" | "late") => {
-    const targetStudent = students.find(s => s.id === id);
-    if (!targetStudent) return;
-
-    let updatedTime = targetStudent.time;
-    if (newStatus === "present" || newStatus === "late") {
-      updatedTime = targetStudent.time === "--:--" ? "08:00 AM" : targetStudent.time;
-    } else {
-      updatedTime = "--:--";
-    }
-
-    // Pessimistic client state render layout updates
-    try {
-      const { error } = await supabase
-        .from("attendance_records")
-        .update({ status: newStatus, check_in_time: updatedTime })
-        .eq("id", id);
-
-      if (error) throw error;
-
-      setStudents(prev => prev.map(s => s.id === id ? { ...s, status: newStatus, time: updatedTime } : s));
-    } catch (err) {
-      alert("Cloud write operations failed. Reverting data state adjustments.");
-    }
-  };
-
-  // Bulk Operations Utility Routine
-  const handleBulkPresent = async () => {
-    if (students.length === 0) return;
-    try {
-      const { error } = await supabase
-        .from("attendance_records")
-        .update({ status: "present", check_in_time: "08:00 AM" })
-        .eq("course_name", selectedCourse)
-        .eq("record_date", targetDateISO);
-
-      if (error) throw error;
-      
-      setStudents(prev => prev.map(s => ({ ...s, status: "present", time: "08:00 AM" })));
-    } catch (err) {
-      alert("Failed to sign off batch processing pipelines.");
-    }
+  // Update Status Event 
+  const handleStatusChange = (id: string, newStatus: "present" | "absent" | "late") => {
+    setStudents(prev => prev.map(student => {
+      if (student.id === id) {
+        let updatedTime = student.time;
+        if (newStatus === "present" || newStatus === "late") {
+          updatedTime = student.time === "--:--" ? "08:00 AM" : student.time;
+        } else {
+          updatedTime = "--:--";
+        }
+        return { ...student, status: newStatus, time: updatedTime };
+      }
+      return student;
+    }));
   };
 
   // Live Aggregation Matrix Calculations 
   const stats = useMemo(() => {
     const total = students.length;
     if (total === 0) return { present: 0, absent: 0, late: 0, rate: "0.0" };
-
     const present = students.filter(s => s.status === "present").length;
     const late = students.filter(s => s.status === "late").length;
     const absent = students.filter(s => s.status === "absent").length;
-    
-    // Attendance rate = (Present + Late) / Total
     const rate = (((present + late) / total) * 100).toFixed(1);
-
     return { present, absent, late, rate };
   }, [students]);
 
   return (
     <div className="p-1 max-w-[1440px] mx-auto space-y-6">
-      
       {/* 1. Header Section */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -142,7 +108,7 @@ export default function Attendance() {
 
       {/* 2. KPI Grid Dashboard Highlights */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-5 rounded-2xl shadow-sm flex items-center gap-4 border border-[#c3c6d7]/30 hover:border-[#004ac6]/30 transition-all">
+        <div className="bg-white p-5 rounded-2xl shadow-sm flex items-center gap-4 border border-[#c3c6d7]/30">
           <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 text-lg">
             <FaCheckCircle />
           </div>
@@ -152,17 +118,17 @@ export default function Attendance() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl shadow-sm flex items-center gap-4 border border-[#c3c6d7]/30 hover:border-red-500/30 transition-all">
+        <div className="bg-white p-5 rounded-2xl shadow-sm flex items-center gap-4 border border-[#c3c6d7]/30">
           <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-[#ba1a1a] text-lg">
             <FaTimesCircle />
           </div>
           <div>
             <p className="text-[10px] font-bold text-[#434655] uppercase tracking-wider">Absent</p>
-            <p className="text-2xl font-black text-[#0d1c2f]"> {isLoading ? "..." : stats.absent}</p>
+            <p className="text-2xl font-black text-[#0d1c2f]">{isLoading ? "..." : stats.absent}</p>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl shadow-sm flex items-center gap-4 border border-[#c3c6d7]/30 hover:border-amber-500/30 transition-all">
+        <div className="bg-white p-5 rounded-2xl shadow-sm flex items-center gap-4 border border-[#c3c6d7]/30">
           <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 text-lg">
             <FaClock />
           </div>
@@ -173,13 +139,13 @@ export default function Attendance() {
         </div>
       </section>
 
-      {/* 3. Operational Strip Filter Row Controls */}
+      {/* 3. Operational Filter Controls */}
       <section className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-[#eff4ff] p-4 rounded-2xl border border-[#c3c6d7]/30">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <FaCalendarAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-[#737686]" />
             <input 
-              className="pl-9 pr-4 py-2 bg-white border border-[#c3c6d7] rounded-xl text-xs font-bold text-[#434655] focus:outline-none selection:bg-transparent cursor-default" 
+              className="pl-9 pr-4 py-2 bg-white border border-[#c3c6d7] rounded-xl text-xs font-bold text-[#434655] focus:outline-none" 
               type="text" 
               readOnly 
               value={formattedDisplayDate}
@@ -187,7 +153,7 @@ export default function Attendance() {
           </div>
           <div className="relative min-w-[180px]">
             <select 
-              value={selectedCourse}
+              value={selectedCourse} 
               onChange={(e) => setSelectedCourse(e.target.value)}
               className="w-full appearance-none pl-3 pr-10 py-2 bg-white border border-[#c3c6d7] rounded-xl text-xs font-bold text-[#434655] focus:outline-none cursor-pointer"
             >
@@ -198,16 +164,13 @@ export default function Attendance() {
             <FaChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#737686] text-[10px] pointer-events-none" />
           </div>
         </div>
-        <button 
-          onClick={handleBulkPresent}
-          className="bg-[#004ac6] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md hover:bg-[#2563eb] active:scale-95 transition-all flex items-center justify-center gap-2"
-        >
+        <button className="bg-[#004ac6] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md hover:bg-[#2563eb] transition-all flex items-center justify-center gap-2">
           <FaUserCheck />
           <span>Mark Bulk Attendance</span>
         </button>
       </section>
 
-      {/* 4. Attendance Main Core Grid Table */}
+      {/* 4. Table core layout */}
       <div className="bg-white rounded-2xl shadow-sm border border-[#c3c6d7]/30 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -249,7 +212,6 @@ export default function Attendance() {
                           className={`p-1.5 rounded-lg text-sm transition-all ${
                             student.status === "present" ? "bg-emerald-500 text-white shadow-sm" : "text-[#737686] hover:text-emerald-600"
                           }`}
-                          title="Mark Present"
                         >
                           <FaCheckCircle />
                         </button>
@@ -258,7 +220,6 @@ export default function Attendance() {
                           className={`p-1.5 rounded-lg text-sm transition-all ${
                             student.status === "absent" ? "bg-red-500 text-white shadow-sm" : "text-[#737686] hover:text-red-600"
                           }`}
-                          title="Mark Absent"
                         >
                           <FaTimesCircle />
                         </button>
@@ -267,7 +228,6 @@ export default function Attendance() {
                           className={`p-1.5 rounded-lg text-sm transition-all ${
                             student.status === "late" ? "bg-amber-500 text-white shadow-sm" : "text-[#737686] hover:text-amber-500"
                           }`}
-                          title="Mark Late"
                         >
                           <FaClock />
                         </button>
@@ -277,28 +237,15 @@ export default function Attendance() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="text-center py-12 text-xs font-bold text-[#434655]">No student records registered for this specific course session.</td>
+                  <td colSpan={5} className="text-center py-12 text-xs font-bold text-[#434655]">
+                    No active student schedules matching this selection query.
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-
-        {/* Footer Navigation */}
-        <div className="px-6 py-4 bg-[#eff4ff] flex items-center justify-between border-t border-[#c3c6d7]/30">
-          <span className="text-xs font-semibold text-[#434655]">Showing {students.length} of {students.length} Students</span>
-          <div className="flex items-center gap-1">
-            <button className="p-1.5 rounded-xl border border-[#c3c6d7] text-[#737686] bg-white hover:bg-[#eff4ff]">
-              <FaChevronLeft className="text-xs" />
-            </button>
-            <button className="w-8 h-8 rounded-xl bg-[#004ac6] text-white text-xs font-bold shadow-sm">1</button>
-            <button className="p-1.5 rounded-xl border border-[#c3c6d7] text-[#737686] bg-white hover:bg-[#eff4ff]">
-              <FaChevronRight className="text-xs" />
-            </button>
-          </div>
-        </div>
       </div>
-
     </div>
   );
 }
