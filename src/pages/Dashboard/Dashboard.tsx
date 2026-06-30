@@ -1,44 +1,65 @@
 import { useState, useEffect } from "react";
 import GlobalSearch from "../../components/GlobalSearch";
-import AdmissionsForm from "../../components/AdmissionsForm";
 import { 
   FaUserGraduate, 
-  FaUsers, 
-  FaMoneyBillWave, 
-  FaChartBar,
+  FaCalendarCheck, 
+  FaClipboardList, 
+  FaDollarSign, 
+  FaChartLine, 
+  FaUserPlus, 
+  FaChalkboardUser, 
+  FaBook, 
+  FaCakeCandles, 
   FaBell,
-  FaCalendarAlt
-} from "react-icons/fa";
+  FaCalendar,
+  FaWallet,
+  FaFileInvoice,
+  FaEnvelope
+} from "react-icons/fa6"; // Using modern react-icons elements
+import { FaCalendarAlt, FaChalkboardTeacher, FaHistory } from "react-icons/fa";
 
 export default function Dashboard() {
   const [backendData, setBackendData] = useState<any>(null);
-  const [liveActivities] = useState<any[]>([]);
-  const [liveMetrics, setLiveMetrics] = useState({
+  
+  // Active state hooks mapped strictly to your senior team's requested metrics
+  const [metrics, setMetrics] = useState({
     totalStudents: 0,
-    activeParents: 0,
-    grossFees: "$0",
+    todayClasses: 0,
+    todayAttendance: "0%",
+    pendingFees: "$0",
+    monthlyRevenue: "$0",
+    newAdmissions: 0,
+    teachersAvailable: 0,
+    activeCourses: 0,
+    upcomingBirthdays: 0,
+    upcomingRenewals: 0,
   });
 
+  // System Notifications array state hook
+  const [notifications, setNotifications] = useState<any[]>([]);
+
   useEffect(() => {
-    // 1. Fetch system status from your Render server
+    // Read base system status from Render core engine layer
     fetch("https://topgrade-backend.onrender.com/api/crm-info")
       .then((res) => res.json())
       .then((data) => {
         setBackendData(data);
-        // If your crm-info endpoint begins passing down aggregated metrics, we bind them here:
-        if (data.metrics) {
-          setLiveMetrics({
-            totalStudents: data.metrics.totalStudents || 0,
-            activeParents: data.metrics.activeParents || 0,
-            grossFees: data.metrics.grossFees || "$0",
-          });
+        // When backend database sync aggregation is ready, it overrides these live states:
+        if (data.liveMetrics) {
+          setMetrics(data.liveMetrics);
         }
       })
-      .catch((err) => console.error("Error connecting to Render backend:", err));
+      .catch((err) => console.error("Error syncing operational data matrix:", err));
   }, []);
 
+  // Quick Action Handler Route Router Links (Placeholders for upcoming feature branches)
+  const handleQuickAction = (actionName: string) => {
+    console.log(`Navigation routing context triggered for system module: ${actionName}`);
+    alert(`Redirecting to live system page for: ${actionName}`);
+  };
+
   return (
-    <div className="space-y-6 p-1 max-w-[1440px] mx-auto">
+    <div className="space-y-6 p-1 max-w-[1600px] mx-auto">
       
       {/* ─── UNIFIED TOP NAVIGATION LAYER ─── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[#c3c6d7]/30 shadow-sm">
@@ -72,89 +93,173 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-2 text-xs font-bold text-[#434655] bg-white px-3 py-1.5 rounded-xl border border-[#c3c6d7]/30 shadow-sm self-start sm:self-auto">
           <FaCalendarAlt className="text-[#004ac6]" />
-          <span>Active Operations Cycle</span>
+          <span>Live Operations Workspace</span>
         </div>
       </div>
 
-      {/* Live Operational Metrics Matrix */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-5 rounded-2xl border border-[#c3c6d7]/30 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-[10px] font-bold text-[#434655] uppercase tracking-wider">Total Enrolled Students</p>
-            <p className="text-2xl font-black text-[#0d1c2f]">{liveMetrics.totalStudents}</p>
+      {/* ─── SENIOR TEAM SPECIFIED WIDGET MATRIX ─── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        
+        {/* Widget 1: Total Students */}
+        <div className="bg-white p-4 rounded-2xl border border-[#c3c6d7]/20 shadow-sm flex items-center justify-between">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-bold text-[#737686] uppercase tracking-wider">Total Students</p>
+            <p className="text-xl font-black text-[#0d1c2f]">{metrics.totalStudents}</p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-blue-500 text-white flex items-center justify-center text-lg shadow-md">
-            <FaUserGraduate />
-          </div>
+          <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center text-sm"><FaUserGraduate /></div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-[#c3c6d7]/30 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-[10px] font-bold text-[#434655] uppercase tracking-wider">Active Parent Profiles</p>
-            <p className="text-2xl font-black text-[#0d1c2f]">{liveMetrics.activeParents}</p>
+        {/* Widget 2: Today's Classes */}
+        <div className="bg-white p-4 rounded-2xl border border-[#c3c6d7]/20 shadow-sm flex items-center justify-between">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-bold text-[#737686] uppercase tracking-wider">Today's Classes</p>
+            <p className="text-xl font-black text-[#0d1c2f]">{metrics.todayClasses}</p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-lg shadow-md">
-            <FaUsers />
-          </div>
+          <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center text-sm"><FaCalendarCheck /></div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-[#c3c6d7]/30 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-[10px] font-bold text-[#434655] uppercase tracking-wider">Gross Revenue Matrix</p>
-            <p className="text-2xl font-black text-[#0d1c2f]">{liveMetrics.grossFees}</p>
+        {/* Widget 3: Today's Attendance */}
+        <div className="bg-white p-4 rounded-2xl border border-[#c3c6d7]/20 shadow-sm flex items-center justify-between">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-bold text-[#737686] uppercase tracking-wider">Today's Attendance</p>
+            <p className="text-xl font-black text-[#0d1c2f]">{metrics.todayAttendance}</p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-amber-500 text-white flex items-center justify-center text-lg shadow-md">
-            <FaMoneyBillWave />
-          </div>
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-sm"><FaClipboardList /></div>
         </div>
+
+        {/* Widget 4: Pending Fees */}
+        <div className="bg-white p-4 rounded-2xl border border-[#c3c6d7]/20 shadow-sm flex items-center justify-between">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-bold text-[#737686] uppercase tracking-wider">Pending Fees</p>
+            <p className="text-xl font-black text-rose-600">{metrics.pendingFees}</p>
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center text-sm"><FaDollarSign /></div>
+        </div>
+
+        {/* Widget 5: Monthly Revenue */}
+        <div className="bg-white p-4 rounded-2xl border border-[#c3c6d7]/20 shadow-sm flex items-center justify-between">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-bold text-[#737686] uppercase tracking-wider">Monthly Revenue</p>
+            <p className="text-xl font-black text-emerald-600">{metrics.monthlyRevenue}</p>
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-sm"><FaChartLine /></div>
+        </div>
+
+        {/* Widget 6: New Admissions */}
+        <div className="bg-white p-4 rounded-2xl border border-[#c3c6d7]/20 shadow-sm flex items-center justify-between">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-bold text-[#737686] uppercase tracking-wider">New Admissions</p>
+            <p className="text-xl font-black text-[#0d1c2f]">{metrics.newAdmissions}</p>
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-600 flex items-center justify-center text-sm"><FaUserPlus /></div>
+        </div>
+
+        {/* Widget 7: Teachers Available */}
+        <div className="bg-white p-4 rounded-2xl border border-[#c3c6d7]/20 shadow-sm flex items-center justify-between">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-bold text-[#737686] uppercase tracking-wider">Teachers Online</p>
+            <p className="text-xl font-black text-[#0d1c2f]">{metrics.teachersAvailable}</p>
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center text-sm"><FaChalkboardTeacher /></div>
+        </div>
+
+        {/* Widget 8: Active Courses */}
+        <div className="bg-white p-4 rounded-2xl border border-[#c3c6d7]/20 shadow-sm flex items-center justify-between">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-bold text-[#737686] uppercase tracking-wider">Active Courses</p>
+            <p className="text-xl font-black text-[#0d1c2f]">{metrics.activeCourses}</p>
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-600 flex items-center justify-center text-sm"><FaBook /></div>
+        </div>
+
+        {/* Widget 9: Upcoming Birthdays */}
+        <div className="bg-white p-4 rounded-2xl border border-[#c3c6d7]/20 shadow-sm flex items-center justify-between">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-bold text-[#737686] uppercase tracking-wider">Birthdays (30d)</p>
+            <p className="text-xl font-black text-[#0d1c2f]">{metrics.upcomingBirthdays}</p>
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-pink-500/10 text-pink-600 flex items-center justify-center text-sm"><FaCakeCandles /></div>
+        </div>
+
+        {/* Widget 10: Upcoming Renewals */}
+        <div className="bg-white p-4 rounded-2xl border border-[#c3c6d7]/20 shadow-sm flex items-center justify-between">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-bold text-[#737686] uppercase tracking-wider">Renewals Due</p>
+            <p className="text-xl font-black text-amber-600">{metrics.upcomingRenewals}</p>
+          </div>
+          <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center text-sm"><FaHistory /></div>
+        </div>
+
       </div>
 
-      {/* Structural Operational Grid Split */}
+      {/* ─── TWO-COLUMN OPERATIONAL LAYOUT SPLIT ─── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Left Column: Core Administrative Admissions Processing Form */}
+        {/* Left Column Area: Quick Actions Command Box */}
         <div className="lg:col-span-2 space-y-6">
-          <AdmissionsForm />
+          <div className="bg-white p-6 rounded-2xl border border-[#c3c6d7]/30 shadow-sm space-y-4">
+            <div>
+              <h3 className="text-sm font-black text-[#0d1c2f] uppercase tracking-wider">System Command Quick Actions</h3>
+              <p className="text-xs text-[#434655]">Direct interface links for core educational management workflows.</p>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <button onClick={() => handleQuickAction("Add Student")} className="flex flex-col items-center justify-center p-4 bg-[#f8f9ff] border border-[#c3c6d7]/20 rounded-xl hover:border-[#004ac6] hover:bg-[#004ac6]/5 transition-all group text-center gap-2">
+                <FaUserPlus className="text-lg text-[#004ac6] group-hover:scale-110 transition-transform" />
+                <span className="text-[11px] font-black text-[#0d1c2f]">Add Student</span>
+              </button>
+              <button onClick={() => handleQuickAction("Receive Payment")} className="flex flex-col items-center justify-center p-4 bg-[#f8f9ff] border border-[#c3c6d7]/20 rounded-xl hover:border-emerald-600 hover:bg-emerald-50/50 transition-all group text-center gap-2">
+                <FaWallet className="text-lg text-emerald-600 group-hover:scale-110 transition-transform" />
+                <span className="text-[11px] font-black text-[#0d1c2f]">Receive Payment</span>
+              </button>
+              <button onClick={() => handleQuickAction("Mark Attendance")} className="flex flex-col items-center justify-center p-4 bg-[#f8f9ff] border border-[#c3c6d7]/20 rounded-xl hover:border-purple-600 hover:bg-purple-50/50 transition-all group text-center gap-2">
+                <FaClipboardList className="text-lg text-purple-600 group-hover:scale-110 transition-transform" />
+                <span className="text-[11px] font-black text-[#0d1c2f]">Mark Attendance</span>
+              </button>
+              <button onClick={() => handleQuickAction("Add Teacher")} className="flex flex-col items-center justify-center p-4 bg-[#f8f9ff] border border-[#c3c6d7]/20 rounded-xl hover:border-amber-600 hover:bg-amber-50/50 transition-all group text-center gap-2">
+                <FaChalkboardTeacher className="text-lg text-amber-600 group-hover:scale-110 transition-transform" />
+                <span className="text-[11px] font-black text-[#0d1c2f]">Add Teacher</span>
+              </button>
+              <button onClick={() => handleQuickAction("Create Schedule")} className="flex flex-col items-center justify-center p-4 bg-[#f8f9ff] border border-[#c3c6d7]/20 rounded-xl hover:border-blue-500 hover:bg-blue-50/50 transition-all group text-center gap-2">
+                <FaCalendarCheck className="text-lg text-blue-500 group-hover:scale-110 transition-transform" />
+                <span className="text-[11px] font-black text-[#0d1c2f]">Create Schedule</span>
+              </button>
+              <button onClick={() => handleQuickAction("Generate Report")} className="flex flex-col items-center justify-center p-4 bg-[#f8f9ff] border border-[#c3c6d7]/20 rounded-xl hover:border-indigo-600 hover:bg-indigo-50/50 transition-all group text-center gap-2">
+                <FaFileInvoice className="text-lg text-indigo-600 group-hover:scale-110 transition-transform" />
+                <span className="text-[11px] font-black text-[#0d1c2f]">Generate Report</span>
+              </button>
+            </div>
+
+            <button onClick={() => handleQuickAction("Send Email")} className="w-full py-2.5 bg-[#0d1c2f] hover:bg-[#004ac6] text-white font-bold text-xs rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2">
+              <FaEnvelope /> Broadcast System Notification / Email Communications
+            </button>
+          </div>
         </div>
 
-        {/* Right Column: Real-time System Logs */}
+        {/* Right Column Area: Senior Requested Notifications Box */}
         <div className="space-y-6">
           <div className="bg-white p-5 rounded-2xl border border-[#c3c6d7]/30 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-[#c3c6d7]/10 pb-3">
               <h3 className="text-xs font-black text-[#0d1c2f] uppercase tracking-wider flex items-center gap-2">
-                <FaBell className="text-amber-500" /> System Action Logs
+                <FaBell className="text-amber-500" /> Notifications Feed
               </h3>
-              <span className="text-[9px] font-bold px-2 py-0.5 bg-[#eff4ff] text-[#004ac6] rounded-full">Live</span>
+              <span className="text-[9px] font-bold px-2 py-0.5 bg-[#eff4ff] text-[#004ac6] rounded-full">Live Realtime</span>
             </div>
             
             <ul className="space-y-3">
-              {liveActivities.length > 0 ? (
-                liveActivities.map((activity) => (
-                  <li key={activity.id} className="p-3 bg-[#f8f9ff] rounded-xl border border-[#c3c6d7]/20 flex flex-col gap-1">
-                    <p className="text-xs font-medium text-[#0d1c2f]">{activity.text}</p>
-                    <span className="text-[9px] font-bold text-[#434655]/60 self-end">{activity.time}</span>
+              {notifications.length > 0 ? (
+                notifications.map((notif, idx) => (
+                  <li key={idx} className="p-3 bg-[#f8f9ff] rounded-xl border border-[#c3c6d7]/20 flex flex-col gap-1">
+                    <p className="text-xs font-medium text-[#0d1c2f]">{notif.message}</p>
+                    <span className="text-[9px] font-bold text-[#434655]/60 self-end">{notif.timestamp}</span>
                   </li>
                 ))
               ) : (
-                <div className="text-center py-6 text-xs font-bold text-[#434655]/60">
-                  Waiting for backend events...
+                <div className="text-center py-12 text-xs font-bold text-[#434655]/60">
+                  No notifications recorded in this active branch cache context.
                 </div>
               )}
             </ul>
-          </div>
-
-          {/* Quick System Context Block */}
-          <div className="bg-gradient-to-br from-[#0d1c2f] to-[#004ac6] p-5 rounded-2xl text-white shadow-md relative overflow-hidden">
-            <div className="absolute right-[-20px] bottom-[-20px] text-white/10 text-9xl pointer-events-none">
-              <FaChartBar />
-            </div>
-            <div className="space-y-2 relative z-10">
-              <p className="text-[9px] font-black uppercase tracking-widest text-blue-200">Security Clearance Scope</p>
-              <h4 className="text-sm font-black tracking-tight">Active Engine Identity Verified</h4>
-              <p className="text-[11px] font-medium text-blue-100/80 leading-relaxed">
-                Database operations executed in this layout context directly address public database endpoints bound to your authenticated Supabase user token schema profiles.
-              </p>
-            </div>
           </div>
         </div>
 
