@@ -1,430 +1,371 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { 
-  FaPlus, 
-  FaSearch, 
-  FaChevronDown, 
-  FaFilter, 
-  FaEllipsisV, 
-  FaChevronLeft, 
-  FaChevronRight, 
-  FaSearchPlus, 
-  FaCheckCircle, 
-  FaAward, 
-  FaExclamationTriangle,
-  FaTimes,
-  FaTrashAlt,
-  FaEnvelope
-} from "react-icons/fa";
-import { supabase } from "../../utils/supabaseClient";
+  FaUserTie, FaUserPlus, FaSpinner, FaCircleCheck, FaTriangleExclamation, 
+  FaXmark, FaChevronRight, FaFileLines, FaCalendarDays, FaGraduationCap,
+  FaChalkboardUser, FaClock, FaEye
+} from "react-icons/fa6";
 
-interface TeacherRecord {
-  id: string;
-  name: string;
-  email: string;
-  dept: string;
-  courses: string[];
-  status: "Available" | "In Class" | "On Leave";
-  isAvailable: boolean;
-  avatar: string;
-}
+export default function TeacherManagement() {
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [activeTab, setActiveTab] = useState("profile"); // profile | availability | assignments | documents
+  const [selectedTeacher, setSelectedTeacher] = useState<any>(null); // Interactive view target
+  const [teachersList, setTeachersList] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
 
-export default function Teachers() {
-  // Live Infrastructure Data States
-  const [teachers, setTeachers] = useState<TeacherRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-
-  // Form Entry States
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    dept: "Science",
-    status: "Available" as "Available" | "In Class" | "On Leave",
-    rawCourses: ""
+  // Form State Layout Mapping requested inputs
+  const [form, setForm] = useState({
+    name: "", photoUrl: "", phone: "", email: "", qualification: "", experience: "", 
+    specialization: "", joiningDate: "", salary: "",
+    availabilityDays: [] as string[],
+    availabilitySlots: [] as string[],
+    assignedStudents: "0", assignedCourses: "0", assignedSchedules: "0",
+    docResume: false, docIdProof: false, docCertificates: false, docContract: false
   });
 
-  // Client Filter states
-  const [searchTerm, setSearchTerm] = useState("");
-  const [deptFilter, setDeptFilter] = useState("All Departments");
-  const [statusFilter, setStatusFilter] = useState("Availability: All");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
-
-  // 1. Initial Resource Fetch Cycle
-  useEffect(() => {
-    fetchLiveTeachers();
-  }, []);
-
-  const fetchLiveTeachers = async () => {
-    setIsLoading(true);
+  const fetchTeachers = async () => {
     try {
-      const { data, error } = await supabase.from("teachers").select("*");
-      if (error) throw error;
-
-      const mapped: TeacherRecord[] = (data || []).map((row) => ({
-        id: row.id,
-        name: row.name,
-        email: row.email,
-        dept: row.dept,
-        courses: row.courses || [],
-        status: row.status,
-        isAvailable: row.is_available,
-        avatar: row.avatar
-      }));
-      setTeachers(mapped);
+      const res = await fetch("https://topgrade-backend.onrender.com/api/teachers/list");
+      const data = await res.json();
+      if (data.success) setTeachersList(data.data);
     } catch (err) {
-      console.error("Error connecting to faculty roster metrics:", err);
+      console.error("Error reading teachers cluster:", err);
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  useEffect(() => { fetchTeachers(); }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleCheckboxChange = (name: string, checked: boolean) => {
+    setForm({ ...form, [name]: checked });
+  };
+
+  const toggleAvailabilityDay = (day: string) => {
+    const current = [...form.availabilityDays];
+    const index = current.indexOf(day);
+    if (index > -1) current.splice(index, 1);
+    else current.push(day);
+    setForm({ ...form, availabilityDays: current });
+  };
+
+  const toggleAvailabilitySlot = (slot: string) => {
+    const current = [...form.availabilitySlots];
+    const index = current.indexOf(slot);
+    if (index > -1) current.splice(index, 1);
+    else current.push(slot);
+    setForm({ ...form, availabilitySlots: current });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true); setSuccess(false); setError("");
+
+    try {
+      const res = await fetch("https://topgrade-backend.onrender.com/api/teachers/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || "Failed to add profile");
+
+      setSuccess(true);
+      setShowAddForm(false);
+      // Reset Form State
+      setForm({
+        name: "", photoUrl: "", phone: "", email: "", qualification: "", experience: "",
+        specialization: "", joiningDate: "", salary: "", availabilityDays: [], availabilitySlots: [],
+        assignedStudents: "0", assignedCourses: "0", assignedSchedules: "0",
+        docResume: false, docIdProof: false, docCertificates: false, docContract: false
+      });
+      fetchTeachers();
+    } catch (err: any) {
+      setError(err.message || "Backend fault context.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 2. Action Routine: Provision New Record
-  const handleCreateTeacher = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const uniqueId = `TCH-${Math.floor(100 + Math.random() * 900)}`;
-    
-    // Parse comma separated strings into a structural array cleanly
-    const coursesArray = formData.rawCourses
-      .split(",")
-      .map(c => c.trim())
-      .filter(c => c.length > 0);
-
-    const payload = {
-      id: uniqueId,
-      name: formData.name.trim(),
-      email: formData.email.trim(),
-      dept: formData.dept,
-      courses: coursesArray,
-      status: formData.status,
-      is_available: formData.status === "Available",
-      avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 900000)}?q=80&w=100`
-    };
-
-    try {
-      const { error } = await supabase.from("teachers").insert([payload]);
-      if (error) throw error;
-
-      await fetchLiveTeachers();
-      setIsModalOpen(false);
-      setFormData({ name: "", email: "", dept: "Science", status: "Available", rawCourses: "" });
-    } catch (err) {
-      alert("Failed to securely append teacher record profiles.");
-    }
-  };
-
-  // 3. Action Routine: Revoke Database Entry
-  const handleDeleteTeacher = async (id: string, name: string) => {
-    if (confirm(`Remove and revoke system profile clearance access for ${name}?`)) {
-      try {
-        const { error } = await supabase.from("teachers").delete().eq("id", id);
-        if (error) throw error;
-        setTeachers(prev => prev.filter(t => t.id !== id));
-        setActiveMenuId(null);
-      } catch (err) {
-        alert("Deletion failure occurred on production rows.");
-      }
-    }
-  };
-
-  // Filter Pipeline Processing Grid Matrix
-  const filteredTeachers = useMemo(() => {
-    return teachers.filter((t) => {
-      const matchesSearch = 
-        t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.email.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesDept = deptFilter === "All Departments" || t.dept === deptFilter;
-      
-      let matchesStatus = true;
-      if (statusFilter !== "Availability: All") {
-        matchesStatus = t.status === statusFilter;
-      }
-
-      return matchesSearch && matchesDept && matchesStatus;
-    });
-  }, [teachers, searchTerm, deptFilter, statusFilter]);
-
-  // Live Multi-page Pagination Calculus
-  const paginatedTeachers = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredTeachers.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredTeachers, currentPage]);
-
-  const totalPages = Math.ceil(filteredTeachers.length / itemsPerPage) || 1;
-
   return (
-    <div className="space-y-6 max-w-[1440px] mx-auto p-1">
+    <div className="p-6 max-w-[1600px] mx-auto space-y-6">
       
-      {/* 1. Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-2xl font-black text-[#004ac6]">Faculty Directory</h2>
-          <span className="px-2.5 py-0.5 bg-[#004ac6]/10 text-[#004ac6] rounded-full text-xs font-bold border border-[#004ac6]/20">
-            {teachers.length} Active Faculty
-          </span>
+      {/* ─── TITLE FRAMEWORK ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#c3c6d7]/20 pb-4">
+        <div>
+          <h1 className="text-xl font-black text-[#0d1c2f]">Faculty & Teacher Management</h1>
+          <p className="text-xs font-semibold text-[#434655]">Orchestrate institutional mentors, track shift availabilities, and supervise schedules.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
-          className="px-5 py-2.5 bg-[#004ac6] text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-[#004ac6]/10 hover:bg-[#2563eb] transition-all active:scale-95"
+          onClick={() => { setShowAddForm(!showAddForm); setSuccess(false); setError(""); }}
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 text-white ${
+            showAddForm ? 'bg-[#434655]' : 'bg-[#004ac6] hover:bg-[#2563eb]'
+          }`}
         >
-          <FaPlus />
-          <span>Add New Teacher</span>
+          {showAddForm ? <><FaXmark /> Close Onboarding</> : <><FaUserPlus /> Add Teacher</>}
         </button>
       </div>
 
-      {/* 2. Filter Strip Controls */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-        <div className="lg:col-span-6 relative">
-          <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-[#737686]" />
-          <input 
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-12 pr-4 py-3 bg-white border border-[#c3c6d7] rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#004ac6]/20 transition-all text-[#0d1c2f]" 
-            placeholder="Search by name, department, or staff ID..." 
-            type="text"
-          />
-        </div>
-        <div className="lg:col-span-3 relative">
-          <select 
-            value={deptFilter}
-            onChange={(e) => { setDeptFilter(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-4 pr-10 py-3 bg-white border border-[#c3c6d7] rounded-2xl text-sm font-semibold text-[#434655] appearance-none focus:outline-none cursor-pointer"
-          >
-            <option>All Departments</option>
-            <option>Science</option>
-            <option>Mathematics</option>
-            <option>Humanities</option>
-          </select>
-          <FaChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-[#737686] pointer-events-none text-xs" />
-        </div>
-        <div className="lg:col-span-3 relative">
-          <select 
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-4 pr-10 py-3 bg-white border border-[#c3c6d7] rounded-2xl text-sm font-semibold text-[#434655] appearance-none focus:outline-none cursor-pointer"
-          >
-            <option>Availability: All</option>
-            <option>In Class</option>
-            <option>Available</option>
-            <option>On Leave</option>
-          </select>
-          <FaFilter className="absolute right-4 top-1/2 -translate-y-1/2 text-[#737686] pointer-events-none text-xs" />
-        </div>
-      </div>
+      {success && <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold p-4 rounded-xl flex items-center gap-2"><FaCircleCheck /> Teacher profile successfully linked into database matrices.</div>}
+      {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs font-bold p-4 rounded-xl flex items-center gap-2"><FaTriangleExclamation /> {error}</div>}
 
-      {/* 3. Main Ledger Table Card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-[#c3c6d7]/50 overflow-hidden">
+      {/* ─── DROPDOWN ONBOARD TEACHER TAB FORM ─── */}
+      {showAddForm && (
+        <form onSubmit={handleSubmit} className="bg-white border border-[#c3c6d7]/40 rounded-2xl p-6 space-y-6 shadow-md animate-fadeIn">
+          <div className="flex border-b border-[#c3c6d7]/20 gap-2 pb-px overflow-x-auto">
+            {[
+              { id: "profile", label: "Teacher Profile", icon: <FaUserTie /> },
+              { id: "availability", label: "Availability Constraints", icon: <FaCalendarDays /> },
+              { id: "assignments", label: "Assign Core Targets", icon: <FaGraduationCap /> },
+              { id: "documents", label: "Documents Verification", icon: <FaFileLines /> }
+            ].map(tab => (
+              <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={`px-4 py-2.5 font-black text-[11px] uppercase tracking-wider rounded-t-xl border-b-2 whitespace-nowrap transition-all flex items-center gap-2 ${
+                activeTab === tab.id ? 'border-[#004ac6] text-[#004ac6] bg-[#f8f9ff]' : 'border-transparent text-[#737686]'
+              }`}>
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* TAB 1: TEACHER PROFILE */}
+          {activeTab === "profile" && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fadeIn">
+              <div className="space-y-1"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Full Name *</label><input type="text" name="name" required value={form.name} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none focus:border-[#004ac6]" /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Photo URL Path</label><input type="text" name="photoUrl" value={form.photoUrl} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Phone Line</label><input type="text" name="phone" value={form.phone} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Email Address</label><input type="email" name="email" value={form.email} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Highest Qualification</label><input type="text" name="qualification" value={form.qualification} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" placeholder="Ex: M.Sc in Mathematics" /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Total Experience</label><input type="text" name="experience" value={form.experience} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" placeholder="Ex: 5 Years" /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Core Specialization</label><input type="text" name="specialization" value={form.specialization} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" placeholder="Ex: Calculus, Trigonometry" /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Joining Date</label><input type="date" name="joiningDate" value={form.joiningDate} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Salary Structure (Monthly)</label><input type="text" name="salary" value={form.salary} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" placeholder="Ex: $4,500" /></div>
+            </div>
+          )}
+
+          {/* TAB 2: AVAILABILITY MATRIX */}
+          {activeTab === "availability" && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-[#434655] uppercase tracking-wider block">Operational Working Days Selection</label>
+                <div className="flex flex-wrap gap-2">
+                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(day => (
+                    <button key={day} type="button" onClick={() => toggleAvailabilityDay(day)} className={`px-3 py-1.5 rounded-xl font-bold text-xs border transition-all ${
+                      form.availabilityDays.includes(day) ? 'bg-[#004ac6] border-[#004ac6] text-white' : 'bg-[#f8f9ff] text-[#434655] border-[#c3c6d7]/40'
+                    }`}>{day}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-[#434655] uppercase tracking-wider block">Daily Active Shifts Availability</label>
+                <div className="flex gap-3">
+                  {["Morning", "Afternoon", "Evening"].map(slot => (
+                    <button key={slot} type="button" onClick={() => toggleAvailabilitySlot(slot)} className={`px-4 py-2 rounded-xl font-bold text-xs border transition-all ${
+                      form.availabilitySlots.includes(slot) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-[#f8f9ff] text-[#434655] border-[#c3c6d7]/40'
+                    }`}>{slot}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: ASSIGNMENTS COUNTERS */}
+          {activeTab === "assignments" && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fadeIn">
+              <div className="space-y-1"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Assign Active Students Count</label><input type="number" name="assignedStudents" value={form.assignedStudents} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Assign Target Courses Count</label><input type="number" name="assignedCourses" value={form.assignedCourses} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Assigned Active Schedules Count</label><input type="number" name="assignedSchedules" value={form.assignedSchedules} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" /></div>
+            </div>
+          )}
+
+          {/* TAB 4: COMPLIANCE DOCUMENTS */}
+          {activeTab === "documents" && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fadeIn">
+              {[
+                { id: "docResume", label: "Professional Resume / CV" },
+                { id: "docIdProof", label: "National Identity Proof" },
+                { id: "docCertificates", label: "Educational Certificates" },
+                { id: "docContract", label: "Signed Employment Contract" }
+              ].map(doc => (
+                <label key={doc.id} className="flex items-center gap-3 bg-[#f8f9ff] p-4 rounded-xl border border-[#c3c6d7]/30 cursor-pointer select-none">
+                  <input type="checkbox" checked={(form as any)[doc.id]} onChange={(e) => handleCheckboxChange(doc.id, e.target.checked)} className="w-4 h-4 text-[#004ac6] border-[#c3c6d7]/60 accent-[#004ac6]" />
+                  <span className="text-xs font-black text-[#0d1c2f]">{doc.label}</span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          <button type="submit" disabled={isLoading} className="w-full bg-[#004ac6] text-white font-bold text-xs py-3 rounded-xl hover:bg-[#2563eb] transition-all flex items-center justify-center gap-2">
+            {isLoading ? <><FaSpinner className="animate-spin" /> Recording Faculty...</> : "Commit Teacher To Core Ledger"}
+          </button>
+        </form>
+      )}
+
+      {/* ─── LEDGER DATA TABLE DISPLAY ─── */}
+      <div className="bg-white border border-[#c3c6d7]/30 rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-[#c3c6d7]/10 bg-[#f8f9ff]"><h2 className="text-xs font-black text-[#0d1c2f] uppercase tracking-wider">Registered Institution Instructors</h2></div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#eff4ff]/50 border-b border-[#c3c6d7]/50">
-                <th className="px-6 py-4 text-xs font-bold text-[#434655] uppercase tracking-wider">Teacher Profile</th>
-                <th className="px-6 py-4 text-xs font-bold text-[#434655] uppercase tracking-wider">Staff ID</th>
-                <th className="px-6 py-4 text-xs font-bold text-[#434655] uppercase tracking-wider">Department</th>
-                <th className="px-6 py-4 text-xs font-bold text-[#434655] uppercase tracking-wider">Assigned Courses</th>
-                <th className="px-6 py-4 text-xs font-bold text-[#434655] uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-[#434655] uppercase tracking-wider text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#c3c6d7]/20">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-12">
-                    <span className="w-6 h-6 border-2 border-[#004ac6]/30 border-t-[#004ac6] inline-block rounded-full animate-spin" />
-                  </td>
+          {isFetching ? (
+            <div className="text-center py-12 text-xs font-bold text-[#434655]/60 flex items-center justify-center gap-2"><FaSpinner className="animate-spin text-[#004ac6]" /> Gathering active faculty maps...</div>
+          ) : teachersList.length === 0 ? (
+            <div className="text-center py-12 text-xs font-bold text-[#434655]/60">No faculty records found inside current database cluster.</div>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#f8f9ff] border-b border-[#c3c6d7]/20">
+                  <th className="p-4 text-[10px] font-black text-[#434655] uppercase tracking-wider">Faculty ID</th>
+                  <th className="p-4 text-[10px] font-black text-[#434655] uppercase tracking-wider">Instructor Profile</th>
+                  <th className="p-4 text-[10px] font-black text-[#434655] uppercase tracking-wider">Specialization</th>
+                  <th className="p-4 text-[10px] font-black text-[#434655] uppercase tracking-wider">Allocations (S / C / Sch)</th>
+                  <th className="p-4 text-[10px] font-black text-[#434655] uppercase tracking-wider text-right">Actions</th>
                 </tr>
-              ) : paginatedTeachers.length > 0 ? (
-                paginatedTeachers.map((teacher) => (
-                  <tr key={teacher.id} className="hover:bg-[#f8f9ff] transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-4">
-                        <img className="w-11 h-11 rounded-full object-cover border border-[#c3c6d7]/30" src={teacher.avatar} alt={teacher.name} />
-                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-[#0d1c2f]">{teacher.name}</span>
-                          <span className="text-xs text-[#434655]">{teacher.email}</span>
-                        </div>
+              </thead>
+              <tbody className="divide-y divide-[#c3c6d7]/10">
+                {teachersList.map((teacher) => (
+                  <tr key={teacher.id} className="hover:bg-[#f8f9ff]/40 transition-colors">
+                    <td className="p-4 text-xs font-bold text-[#004ac6]">{teacher.teacher_id_code}</td>
+                    <td className="p-4 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-indigo-600 text-white font-black text-[10px] flex items-center justify-center uppercase overflow-hidden">
+                        {teacher.photo_url ? <img src={teacher.photo_url} alt="" className="w-full h-full object-cover" /> : teacher.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-[#0d1c2f]">{teacher.name}</p>
+                        <p className="text-[10px] text-[#434655]">{teacher.email || "No email"}</p>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm font-medium text-[#434655]">{teacher.id}</td>
-                    <td className="px-6 py-4 text-sm font-medium text-[#0d1c2f]">{teacher.dept}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-1">
-                        {teacher.courses.map((course, cIdx) => (
-                          <span key={cIdx} className="px-2 py-0.5 bg-[#d3e4fe] text-[#38485d] rounded-full text-[10px] font-bold">
-                            {course}
-                          </span>
-                        ))}
-                      </div>
+                    <td className="p-4 text-xs font-semibold text-[#434655]">{teacher.specialization || "General Faculty"}</td>
+                    <td className="p-4 text-xs font-bold text-[#0d1c2f]">
+                      {teacher.assigned_students_count} Std / {teacher.assigned_courses_count} Crs / {teacher.assigned_schedules_count} Sch
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold border ${
-                        teacher.isAvailable 
-                          ? "bg-emerald-500/10 text-[#006242] border-emerald-500/20" 
-                          : teacher.status === "On Leave" 
-                            ? "bg-red-500/10 text-red-700 border-red-500/20"
-                            : "bg-[#004ac6]/10 text-[#004ac6] border-[#004ac6]/20"
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${
-                          teacher.isAvailable ? "bg-emerald-500" : teacher.status === "On Leave" ? "bg-red-500" : "bg-[#004ac6] animate-pulse"
-                        }`} />
-                        {teacher.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right relative">
-                      <button 
-                        onClick={() => setActiveMenuId(activeMenuId === teacher.id ? null : teacher.id)}
-                        className="hover:bg-[#eff4ff] rounded-full p-2 text-[#737686] transition-all"
-                      >
-                        <FaEllipsisV className="text-xs" />
+                    <td className="p-4 text-right">
+                      <button onClick={() => setSelectedTeacher(teacher)} className="px-3 py-1.5 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-[11px] font-black text-[#0d1c2f] inline-flex items-center gap-1.5 shadow-sm hover:bg-indigo-600 hover:text-white transition-all">
+                        <FaEye /> Dashboard & Profile <FaChevronRight className="text-[9px]" />
                       </button>
-
-                      {activeMenuId === teacher.id && (
-                        <>
-                          <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                          <div className="absolute right-6 top-12 bg-white border border-[#c3c6d7]/40 shadow-xl rounded-xl py-1.5 w-40 text-left z-20">
-                            <button 
-                              onClick={() => { window.location.href = `mailto:${teacher.email}`; setActiveMenuId(null); }}
-                              className="w-full px-3.5 py-2 text-[11px] font-bold text-[#434655] hover:bg-[#eff4ff] hover:text-[#004ac6] flex items-center gap-2 transition-all"
-                            >
-                              <FaEnvelope /> <span>Email Staff</span>
-                            </button>
-                            <hr className="border-[#c3c6d7]/20 my-1" />
-                            <button 
-                              onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}
-                              className="w-full px-3.5 py-2 text-[11px] font-bold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-all"
-                            >
-                              <FaTrashAlt /> <span>Remove Access</span>
-                            </button>
-                          </div>
-                        </>
-                      )}
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="text-center py-12 text-xs font-bold text-[#434655]">No faculty match criteria parameters.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Dynamic Pagination Footer */}
-        <div className="px-6 py-4 bg-[#f8f9ff] border-t border-[#c3c6d7]/50 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs font-semibold text-[#434655]">
-            Showing <span className="font-bold text-[#0d1c2f]">
-              {filteredTeachers.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}-
-              {Math.min(currentPage * itemsPerPage, filteredTeachers.length)}
-            </span> of <span className="font-bold text-[#0d1c2f]">{filteredTeachers.length}</span> results
-          </p>
-          <div className="flex items-center gap-1">
-            <button 
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(prev => prev - 1)}
-              className="w-8 h-8 flex items-center justify-center rounded-xl border border-[#c3c6d7] text-[#737686] disabled:opacity-30"
-            >
-              <FaChevronLeft className="text-xs" />
-            </button>
-            <span className="text-xs font-bold text-[#0d1c2f] px-2">Page {currentPage} of {totalPages}</span>
-            <button 
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(prev => prev + 1)}
-              className="w-8 h-8 flex items-center justify-center rounded-xl border border-[#c3c6d7] text-[#737686] disabled:opacity-30"
-            >
-              <FaChevronRight className="text-xs" />
-            </button>
-          </div>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
-      {/* 4. Extra Analytics Matrix Footer */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-3xl border border-[#c3c6d7]/50 shadow-sm flex flex-col gap-2">
-          <div className="w-10 h-10 rounded-xl bg-[#004ac6]/10 flex items-center justify-center text-[#004ac6]"><FaSearchPlus /></div>
-          <div>
-            <p className="text-[#434655] text-xs font-bold">Open Vacancies</p>
-            <h4 className="text-2xl font-black text-[#0d1c2f] mt-1">12</h4>
-          </div>
-          <p className="text-[#006242] font-bold text-[11px]">📈 4 from last month</p>
-        </div>
-        <div className="bg-white p-6 rounded-3xl border border-[#c3c6d7]/50 shadow-sm flex flex-col gap-2">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-[#006242]"><FaCheckCircle /></div>
-          <div>
-            <p className="text-[#434655] text-xs font-bold">Average Rating</p>
-            <h4 className="text-2xl font-black text-[#0d1c2f] mt-1">4.8/5</h4>
-          </div>
-          <p className="text-[#006242] font-bold text-[11px] flex items-center gap-1"><FaAward /> <span>Top 5% Faculty</span></p>
-        </div>
-        <div className="bg-[#004ac6] p-6 rounded-3xl shadow-lg flex flex-col gap-2 relative overflow-hidden group">
-          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-white">✨</div>
-          <div>
-            <p className="text-white/80 text-xs font-bold">Attendance Score</p>
-            <h4 className="text-2xl font-black text-white mt-1">98.4%</h4>
-          </div>
-          <p className="text-white/60 text-[10px] font-medium">Faculty reliability all-time high</p>
-        </div>
-        <div className="bg-white p-6 rounded-3xl border border-[#c3c6d7]/50 shadow-sm flex flex-col gap-2">
-          <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-[#ba1a1a]"><FaExclamationTriangle /></div>
-          <div>
-            <p className="text-[#434655] text-xs font-bold">Pending Approvals</p>
-            <h4 className="text-2xl font-black text-[#0d1c2f] mt-1">07</h4>
-          </div>
-          <p className="text-[#ba1a1a] font-bold text-[11px]">⚠️ Requires action</p>
-        </div>
-      </div>
-
-      {/* Account Provision Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl border border-[#c3c6d7]/50 shadow-2xl max-w-md w-full p-6 relative">
-            <button onClick={() => setIsModalOpen(false)} className="absolute right-4 top-4 text-[#434655]/50 hover:text-[#0d1c2f]"><FaTimes /></button>
-            <div className="mb-4">
-              <h3 className="text-base font-black text-[#0d1c2f]">Add Teacher Record</h3>
-              <p className="text-[11px] font-medium text-[#434655]">Provision corporate educational clearance profiles.</p>
+      {/* ─── SLIDEOUT FACULTY PROFILE AND LIVE DASHBOARD MODAL LAYER ─── */}
+      {selectedTeacher && (
+        <div className="fixed inset-0 bg-[#0d1c2f]/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[92vh] overflow-y-auto border border-[#c3c6d7]/40 shadow-2xl flex flex-col">
+            
+            <div className="p-5 border-b border-[#c3c6d7]/10 flex items-center justify-between bg-[#f8f9ff]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white text-sm font-black flex items-center justify-center uppercase">{selectedTeacher.name.charAt(0)}</div>
+                <div>
+                  <h3 className="text-sm font-black text-[#0d1c2f]">{selectedTeacher.name} — Workspace</h3>
+                  <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Faculty Module Profile Node: {selectedTeacher.teacher_id_code}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedTeacher(null)} className="w-8 h-8 rounded-xl bg-white border border-[#c3c6d7]/40 flex items-center justify-center text-xs text-[#434655] hover:bg-rose-50 hover:text-rose-600 transition-colors shadow-sm"><FaXmark /></button>
             </div>
-            <form onSubmit={handleCreateTeacher} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-black text-[#434655] uppercase tracking-wider mb-1">Full Name</label>
-                <input required type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} placeholder="e.g. Dr. Emily Watson" className="w-full text-xs font-semibold rounded-xl border-[#c3c6d7] bg-[#eff4ff]/20 py-2.5 px-3 focus:bg-white focus:ring-2 focus:ring-[#004ac6] transition-all" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-[#434655] uppercase tracking-wider mb-1">Email Address</label>
-                <input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="username@topgrade.edu" className="w-full text-xs font-semibold rounded-xl border-[#c3c6d7] bg-[#eff4ff]/20 py-2.5 px-3 focus:bg-white focus:ring-2 focus:ring-[#004ac6] transition-all" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-black text-[#434655] uppercase tracking-wider mb-1">Department</label>
-                  <select value={formData.dept} onChange={(e) => setFormData({...formData, dept: e.target.value})} className="w-full text-xs font-bold rounded-xl border-[#c3c6d7] bg-[#eff4ff]/20 py-2.5 px-3 focus:ring-2 focus:ring-[#004ac6]">
-                    <option>Science</option>
-                    <option>Mathematics</option>
-                    <option>Humanities</option>
-                  </select>
+
+            <div className="p-6 space-y-8 overflow-y-auto">
+              
+              {/* VIRTUAL TEACHER DASHBOARD PANEL LAYOUT */}
+              <div className="bg-[#f8f9ff] border border-indigo-600/20 rounded-2xl p-5 space-y-4 shadow-inner">
+                <div className="flex items-center justify-between border-b border-[#c3c6d7]/20 pb-2">
+                  <h4 className="text-xs font-black text-[#0d1c2f] uppercase tracking-wider flex items-center gap-2"><FaChalkboardUser className="text-indigo-600" /> Live Teacher Performance Dashboard Frame</h4>
+                  <span className="text-[9px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full uppercase tracking-wider">Active Stream</span>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-black text-[#434655] uppercase tracking-wider mb-1">Initial Status</label>
-                  <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value as any})} className="w-full text-xs font-bold rounded-xl border-[#c3c6d7] bg-[#eff4ff]/20 py-2.5 px-3 focus:ring-2 focus:ring-[#004ac6]">
-                    <option value="Available">Available</option>
-                    <option value="In Class">In Class</option>
-                    <option value="On Leave">On Leave</option>
-                  </select>
+                
+                {/* Virtual Dashboard Counters requested by senior system metrics */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-white p-3 rounded-xl border border-[#c3c6d7]/20 shadow-sm">
+                    <p className="text-[9px] font-black text-[#737686] uppercase tracking-wider">Today's Classes</p>
+                    <p className="text-base font-black text-[#0d1c2f]">3 Sessions Scheduled</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-[#c3c6d7]/20 shadow-sm">
+                    <p className="text-[9px] font-black text-[#737686] uppercase tracking-wider">Total Active Students</p>
+                    <p className="text-base font-black text-[#004ac6]">{selectedTeacher.assigned_students_count} Active Profiles</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-[#c3c6d7]/20 shadow-sm">
+                    <p className="text-[9px] font-black text-amber-600 uppercase tracking-wider">Attendance Pending</p>
+                    <p className="text-base font-black text-amber-600">1 Batch Session Alert</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-[#c3c6d7]/20 shadow-sm">
+                    <p className="text-[9px] font-black text-purple-600 uppercase tracking-wider">Upcoming Sessions</p>
+                    <p className="text-base font-black text-purple-600">Tomorrow, 10:00 AM</p>
+                  </div>
                 </div>
               </div>
-              <div>
-                <label className="block text-[10px] font-black text-[#434655] uppercase tracking-wider mb-1">Assigned Courses (Comma Separated)</label>
-                <input type="text" value={formData.rawCourses} onChange={(e) => setFormData({...formData, rawCourses: e.target.value})} placeholder="e.g. Biology 101, Chemistry" className="w-full text-xs font-semibold rounded-xl border-[#c3c6d7] bg-[#eff4ff]/20 py-2.5 px-3 focus:bg-white focus:ring-2 focus:ring-[#004ac6] transition-all" />
+
+              {/* BIO BIOGRAPHICAL DOSSIER SPLIT */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                <div className="space-y-3">
+                  <h5 className="text-[10px] font-black text-[#0d1c2f] uppercase tracking-wider border-b border-[#c3c6d7]/10 pb-1 flex items-center gap-1.5"><FaUserTie /> Biographical Profile</h5>
+                  <div className="space-y-2 text-xs font-semibold text-[#434655]">
+                    <div><p className="text-[9px] uppercase tracking-wide font-black text-[#737686]">Contact Phone</p><p className="text-[#0d1c2f]">{selectedTeacher.phone || "Not Listed"}</p></div>
+                    <div><p className="text-[9px] uppercase tracking-wide font-black text-[#737686]">Email Profile</p><p className="text-[#0d1c2f]">{selectedTeacher.email || "Not Listed"}</p></div>
+                    <div><p className="text-[9px] uppercase tracking-wide font-black text-[#737686]">Faculty Qualification</p><p className="text-[#0d1c2f]">{selectedTeacher.qualification || "Not Stated"}</p></div>
+                    <div><p className="text-[9px] uppercase tracking-wide font-black text-[#737686]">Experience Level / Specialization</p><p className="text-[#0d1c2f]">{selectedTeacher.experience || "0 Yrs"} ({selectedTeacher.specialization || "General Scope"})</p></div>
+                    <div><p className="text-[9px] uppercase tracking-wide font-black text-[#737686]">Joining Date / Current Salary</p><p className="text-[#0d1c2f]">{selectedTeacher.joining_date || "Pending"} | <span className="text-emerald-700 font-black">{selectedTeacher.salary || "N/A"}</span></p></div>
+                  </div>
+                </div>
+
+                {/* SHIFT SCHEDULE AVAILABILITY BADGES DISPLAY */}
+                <div className="space-y-3">
+                  <h5 className="text-[10px] font-black text-[#0d1c2f] uppercase tracking-wider border-b border-[#c3c6d7]/10 pb-1 flex items-center gap-1.5"><FaCalendarDays /> Shift Availabilities</h5>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-[9px] uppercase tracking-wide font-black text-[#737686] mb-1">Approved Days Block</p>
+                      <div className="flex flex-wrap gap-1">
+                        {Array.isArray(selectedTeacher.availability_days) && selectedTeacher.availability_days.map((d: string) => (
+                          <span key={d} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold text-[10px] rounded-md">{d}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[9px] uppercase tracking-wide font-black text-[#737686] mb-1">Operational Shift Blocks</p>
+                      <div className="flex flex-wrap gap-1">
+                        {Array.isArray(selectedTeacher.availability_slots) && selectedTeacher.availability_slots.map((s: string) => (
+                          <span key={s} className="px-2 py-0.5 bg-purple-50 border border-purple-100 text-purple-700 font-bold text-[10px] rounded-md flex items-center gap-1"><FaClock className="text-[8px]" /> {s}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* DOCUMENTS CLEARANCE CHECKS */}
+                <div className="space-y-3">
+                  <h5 className="text-[10px] font-black text-[#0d1c2f] uppercase tracking-wider border-b border-[#c3c6d7]/10 pb-1 flex items-center gap-1.5"><FaFileLines /> Verification Files Compliance</h5>
+                  <div className="space-y-1.5">
+                    {[
+                      { flag: selectedTeacher.doc_resume, label: "Professional Curriculum Vitae" },
+                      { flag: selectedTeacher.doc_id_proof, label: "Identity Verification Files" },
+                      { flag: selectedTeacher.doc_certificates, label: "Educational Degree Validation" },
+                      { flag: selectedTeacher.doc_contract, label: "Active Signed Employment Contract" }
+                    ].map((doc, idx) => (
+                      <div key={idx} className={`p-2 rounded-xl border text-[10px] font-black flex items-center justify-between ${
+                        doc.flag ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'
+                      }`}>
+                        <span>{doc.label}</span>
+                        <span>{doc.flag ? "Verified" : "Missing / Needed"}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
               </div>
-              <div className="flex gap-3 justify-end pt-2">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2.5 rounded-xl border border-[#c3c6d7] text-[#434655] font-bold text-xs hover:bg-[#eff4ff]/40">Cancel</button>
-                <button type="submit" className="px-4 py-2.5 rounded-xl bg-[#004ac6] hover:bg-[#2563eb] text-white font-bold text-xs shadow-sm">Save Record</button>
-              </div>
-            </form>
+              
+            </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }
