@@ -18,7 +18,7 @@ interface SidebarProps {
 export default function Sidebar({ onLogout }: SidebarProps) {
   const location = useLocation();
 
-  // Your complete navigation matrix configuration array
+  // Navigation matrix configuration array
   const navItems = [
     { name: "Dashboard", path: "/", icon: <FaTachometerAlt /> },
     { name: "Students", path: "/students", icon: <FaUserGraduate /> },
@@ -33,14 +33,25 @@ export default function Sidebar({ onLogout }: SidebarProps) {
   return (
     <aside className="w-64 fixed left-0 top-0 h-screen bg-white border-r border-[#c3c6d7]/40 p-4 flex flex-col justify-between z-20">
       <div className="space-y-6">
-        {/* Sidebar Header Brand Area */}
-        <div className="px-2.5 py-2">
-          <h2 className="text-sm font-black text-[#004ac6] tracking-tight">TopGrade CRM</h2>
-          <p className="text-[10px] font-bold text-[#434655]/60 uppercase tracking-wider">Management Hub</p>
+        
+        {/* ─── SYSTEM BRAND LOGO HEADER ─── */}
+        <div className="px-2 py-3 flex flex-col items-center justify-center border-b border-[#c3c6d7]/10 bg-[#f8f9ff]/40 rounded-xl mb-2">
+          <img 
+            src="/Topgrade@123.png" 
+            alt="Top Grade Learning Official Logo" 
+            className="h-12 w-auto object-contain drop-shadow-sm mb-1" 
+            onError={(e) => {
+              // Fallback just in case the path is slightly different in your environment
+              (e.target as HTMLImageElement).src = "./logo.png";
+            }}
+          />
+          <div className="text-center">
+            <p className="text-[9px] font-black tracking-widest text-[#004ac6] uppercase">Management Hub</p>
+          </div>
         </div>
         
         {/* Navigation Links List */}
-        <nav className="flex flex-col gap-1 overflow-y-auto max-h-[calc(100vh-160px)] pr-1">
+        <nav className="flex flex-col gap-1 overflow-y-auto max-h-[calc(100vh-210px)] pr-1">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
