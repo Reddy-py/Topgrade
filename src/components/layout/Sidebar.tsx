@@ -39,7 +39,7 @@ export default function Sidebar({ onLogout }: SidebarProps) {
           <img 
             src="/Topgrade@123.png" 
             alt="Top Grade Learning Official Logo" 
-            className="h-20 max-h-24 w-auto object-contain drop-shadow-sm mb-2" 
+            className="h-18 max-h-24 w-auto object-contain drop-shadow-sm mb-2" 
             onError={(e) => {
               (e.target as HTMLImageElement).src = "./Topgrade@123.png";
             }}
