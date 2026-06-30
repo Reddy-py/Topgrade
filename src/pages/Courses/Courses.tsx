@@ -1,478 +1,227 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { 
-  FaSearch, 
-  FaChevronDown, 
-  FaPlus, 
-  FaEllipsisV, 
-  FaBookmark, 
-  FaChevronLeft,
-  FaChevronRight,
-  FaTimes,
-  FaTrashAlt
-} from "react-icons/fa";
-import { supabase } from "../../utils/supabaseClient";
+  FaBookOpen, FaFolderPlus, FaSpinner, FaCircleCheck, FaTriangleExclamation, 
+  FaXmark, FaChevronRight, FaEye, FaUsersGear, FaDollarSign, FaGraduationCap
+} from "react-icons/fa6";
 
-interface CourseRecord {
-  code: string;
-  title: string;
-  instructor: string;
-  enrolled: number;
-  max: number;
-  pct: number;
-  status: "Open" | "Full";
-  isFull: boolean;
-  credits: number;
-  syllabus: "Draft" | "Ready";
-  avatar: string;
-  department: string;
-  description: string;
-  isFeatured: boolean;
-}
+export default function CourseManagement() {
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState<any>(null);
+  const [coursesList, setCoursesList] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
 
-export default function Courses() {
-  // Live Data Infrastructure
-  const [courses, setCourses] = useState<CourseRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-
-  // New Course Creation Entry States
-  const [formData, setFormData] = useState({
-    code: "",
-    title: "",
-    instructor: "Dr. Sarah Jenkins",
-    max: 30,
-    department: "Mathematics",
-    credits: 4,
-    syllabus: "Draft" as "Draft" | "Ready",
-    description: "",
-    isFeatured: false
+  const [form, setForm] = useState({
+    name: "Coding", // Defaults to standard stack preset
+    description: "", ageGroup: "6-12 Years", duration: "3 Months",
+    fee: "", maxStudents: "15", requiredTeacherSkills: "", courseMaterial: "", status: "Active"
   });
 
-  // Filtering & Pagination Interface Configuration
-  const [searchTerm, setSearchTerm] = useState("");
-  const [deptFilter, setDeptFilter] = useState("All Departments");
-  const [statusFilter, setStatusFilter] = useState("Enrollment Status");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const presetPrograms = [
+    "Coding", "Math", "Robotics", "Reading", "3D Printing", "AI", "Chess", "Abacus"
+  ];
 
-  useEffect(() => {
-    fetchLiveCourses();
-  }, []);
-
-  const fetchLiveCourses = async () => {
-    setIsLoading(true);
+  const fetchCourses = async () => {
     try {
-      const { data, error } = await supabase.from("courses").select("*");
-      if (error) throw error;
-
-      const mapped: CourseRecord[] = (data || []).map((row) => {
-        const pctValue = row.max_capacity > 0 ? Math.min(100, Math.round((row.enrolled / row.max_capacity) * 100)) : 0;
-        return {
-          code: row.code,
-          title: row.title,
-          instructor: row.instructor,
-          enrolled: row.enrolled,
-          max: row.max_capacity,
-          pct: pctValue,
-          status: row.enrolled >= row.max_capacity ? "Full" : "Open",
-          isFull: row.enrolled >= row.max_capacity,
-          credits: row.credits,
-          syllabus: row.syllabus,
-          avatar: row.avatar,
-          department: row.department,
-          description: row.description || "",
-          isFeatured: row.is_featured
-        };
-      });
-
-      setCourses(mapped);
+      const res = await fetch("https://topgrade-backend.onrender.com/api/courses/list");
+      const data = await res.json();
+      if (data.success) setCoursesList(data.data);
     } catch (err) {
-      console.error("Error synchronizing active course catalog catalogs:", err);
+      console.error("Ledger reading structural break:", err);
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  useEffect(() => { fetchCourses(); }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true); setSuccess(false); setError("");
+
+    try {
+      const res = await fetch("https://topgrade-backend.onrender.com/api/courses/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || "Failed to catalog course.");
+
+      setSuccess(true);
+      setShowAddForm(false);
+      setForm({ name: "Coding", description: "", ageGroup: "6-12 Years", duration: "3 Months", fee: "", maxStudents: "15", requiredTeacherSkills: "", courseMaterial: "", status: "Active" });
+      fetchCourses();
+    } catch (err: any) {
+      setError(err.message || "Gateway API mismatch context.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Submit Action Routine: Provision New Record Row
-  const handleCreateCourse = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const avatarMap: Record<string, string> = {
-      "Dr. Sarah Jenkins": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=100",
-      "Prof. Michael Chen": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?q=80&w=100",
-      "Elena Rodriguez": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=100",
-      "Dr. Alan Turing": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=100"
-    };
-
-    const payload = {
-      code: formData.code.trim().toUpperCase(),
-      title: formData.title.trim(),
-      instructor: formData.instructor,
-      enrolled: 0, // Starts fresh with zero enrollment allocations
-      max_capacity: Number(formData.max),
-      department: formData.department,
-      status: "Open",
-      credits: Number(formData.credits),
-      syllabus: formData.syllabus,
-      avatar: avatarMap[formData.instructor] || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=100",
-      description: formData.description.trim(),
-      is_featured: formData.isFeatured
-    };
-
-    try {
-      const { error } = await supabase.from("courses").insert([payload]);
-      if (error) throw error;
-
-      await fetchLiveCourses();
-      setIsModalOpen(false);
-      setFormData({
-        code: "", title: "", instructor: "Dr. Sarah Jenkins", max: 30,
-        department: "Mathematics", credits: 4, syllabus: "Draft", description: "", isFeatured: false
-      });
-    } catch (err) {
-      alert("Failed to register and deploy new program listing metadata parameters.");
-    }
-  };
-
-  // Action Routine: Revoke Course Entry
-  const handleDeleteCourse = async (code: string) => {
-    if (confirm(`Permanently terminate data listing access rules for ${code}?`)) {
-      try {
-        const { error } = await supabase.from("courses").delete().eq("code", code);
-        if (error) throw error;
-        setCourses(prev => prev.filter(c => c.code !== code));
-        setActiveMenuId(null);
-      } catch (err) {
-        alert("Deletion failure occurred on database course nodes.");
-      }
-    }
-  };
-
-  // Client Data Pipeline Filtering Matrix
-  const filteredCourses = useMemo(() => {
-    return courses.filter((c) => {
-      const matchesSearch = 
-        c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.instructor.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesDept = deptFilter === "All Departments" || c.department === deptFilter;
-      
-      let matchesStatus = true;
-      if (statusFilter === "Open") matchesStatus = !c.isFull;
-      if (statusFilter === "Full") matchesStatus = c.isFull;
-
-      return matchesSearch && matchesDept && matchesStatus;
-    });
-  }, [courses, searchTerm, deptFilter, statusFilter]);
-
-  // Handle Standard Non-Featured Multi-page Array Splitting
-  const standardCourses = useMemo(() => filteredCourses.filter(c => !c.isFeatured), [filteredCourses]);
-  const featuredCourses = useMemo(() => filteredCourses.filter(c => c.isFeatured), [filteredCourses]);
-
-  const paginatedStandard = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return standardCourses.slice(startIndex, startIndex + itemsPerPage);
-  }, [standardCourses, currentPage]);
-
-  const totalPages = Math.ceil(standardCourses.length / itemsPerPage) || 1;
-
   return (
-    <div className="p-1 max-w-[1440px] mx-auto w-full space-y-6">
+    <div className="p-6 max-w-[1600px] mx-auto space-y-6">
       
-      {/* 1. Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      {/* ─── MODULE HEADER ROW ─── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#c3c6d7]/20 pb-4">
         <div>
-          <h2 className="text-3xl font-black text-[#0d1c2f] tracking-tight">Course Catalog</h2>
-          <div className="flex items-center gap-3 mt-2">
-            <span className="bg-[#2563eb]/10 text-[#004ac6] px-3 py-1 rounded-full text-xs font-bold">
-              {courses.length} Active Programs
-            </span>
-            <span className="text-xs text-[#434655]/70 font-medium">Synced live with Supabase Engine</span>
-          </div>
+          <h1 className="text-xl font-black text-[#0d1c2f]">Curriculum & Course Framework</h1>
+          <p className="text-xs font-semibold text-[#434655]">Provision active tracks, establish seat criteria, and configure standard pricing profiles.</p>
         </div>
-
-        {/* Filters and Utilities Controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[160px]">
-            <select 
-              value={deptFilter}
-              onChange={(e) => { setDeptFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-3 pr-10 py-2 bg-white border border-[#c3c6d7] rounded-xl appearance-none text-xs font-bold text-[#434655] focus:outline-none cursor-pointer"
-            >
-              <option>All Departments</option>
-              <option>Mathematics</option>
-              <option>Computer Science</option>
-              <option>Business</option>
-              <option>Design</option>
-            </select>
-            <FaChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#737686] pointer-events-none text-[10px]" />
-          </div>
-
-          <div className="relative min-w-[160px]">
-            <select 
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-3 pr-10 py-2 bg-white border border-[#c3c6d7] rounded-xl appearance-none text-xs font-bold text-[#434655] focus:outline-none cursor-pointer"
-            >
-              <option>All Enrollment Statuses</option>
-              <option value="Open">Open</option>
-              <option value="Full">Full</option>
-            </select>
-            <FaChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-[#737686] pointer-events-none text-[10px]" />
-          </div>
-
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="bg-[#004ac6] text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-[#2563eb] transition-all shadow-md shadow-[#004ac6]/10 active:scale-95"
-          >
-            <FaPlus />
-            <span>Create Course</span>
-          </button>
-        </div>
+        <button 
+          onClick={() => { setShowAddForm(!showAddForm); setSuccess(false); setError(""); }}
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 text-white ${
+            showAddForm ? 'bg-[#434655]' : 'bg-[#004ac6] hover:bg-[#2563eb]'
+          }`}
+        >
+          {showAddForm ? <><FaXmark /> Cancel Creation</> : <><FaFolderPlus /> Deploy Program</>}
+        </button>
       </div>
 
-      {/* 2. Search Box Option Strip */}
-      <div className="relative w-full max-w-xl">
-        <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-[#737686] text-sm" />
-        <input 
-          value={searchTerm}
-          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-          className="w-full pl-11 pr-4 py-2.5 bg-white border border-[#c3c6d7] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#004ac6]/20 transition-all text-[#0d1c2f]" 
-          placeholder="Search programs, codes, or instructors..." 
-          type="text"
-        />
-      </div>
+      {success && <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold p-4 rounded-xl flex items-center gap-2"><FaCircleCheck /> Program structure fully written into system catalogs.</div>}
+      {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs font-bold p-4 rounded-xl flex items-center gap-2"><FaTriangleExclamation /> {error}</div>}
 
-      {/* 3. Catalog Modular Grid Structure Canvas Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoading ? (
-          <div className="col-span-full text-center py-12">
-            <span className="w-8 h-8 border-4 border-[#004ac6]/20 border-t-[#004ac6] inline-block rounded-full animate-spin" />
-          </div>
-        ) : paginatedStandard.length > 0 || featuredCourses.length > 0 ? (
-          <>
-            {/* Standard Course Cards */}
-            {paginatedStandard.map((course) => (
-              <div key={course.code} className="bg-white rounded-2xl p-6 border border-[#c3c6d7]/40 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-4 group relative">
-                <div className="flex justify-between items-start">
-                  <span className="text-[11px] font-bold text-[#004ac6] bg-[#dbe1ff] px-3 py-1 rounded-lg">
-                    {course.code}
-                  </span>
-                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide ${
-                    course.isFull ? "bg-red-100 text-[#ba1a1a]" : "bg-emerald-100 text-[#006242]"
-                  }`}>
-                    {course.status}
-                  </span>
-                </div>
-
-                <div>
-                  <h3 className="text-base font-black text-[#0d1c2f] mb-1 group-hover:text-[#004ac6] transition-colors line-clamp-1">
-                    {course.title}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-2">
-                    <img className="w-6 h-6 rounded-full object-cover border" src={course.avatar} alt={course.instructor} />
-                    <span className="text-xs font-semibold text-[#434655]">{course.instructor}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 mt-2">
-                  <div className="flex justify-between text-xs font-semibold">
-                    <span className="text-[#434655]/80">Enrollment</span>
-                    <span className="text-[#0d1c2f]">{course.enrolled} / {course.max} Enrolled</span>
-                  </div>
-                  <div className="h-2 w-full bg-[#f8f9ff] border border-[#c3c6d7]/20 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full transition-all duration-500 ${course.isFull ? 'bg-[#ba1a1a]' : 'bg-[#004ac6]'}`} 
-                      style={{ width: `${course.pct}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-[#c3c6d7]/30 mt-auto relative">
-                  <div className="flex gap-2 items-center">
-                    <span className="bg-[#eff4ff] text-[#434655] px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border">
-                      Syllabus: {course.syllabus}
-                    </span>
-                    <span className="text-[11px] font-bold text-[#505f76] flex items-center gap-1">
-                      <FaBookmark className="text-[9px] opacity-60" />
-                      {course.credits} Credits
-                    </span>
-                  </div>
-                  
-                  <button 
-                    onClick={() => setActiveMenuId(activeMenuId === course.code ? null : course.code)}
-                    className="text-[#737686] hover:text-[#0d1c2f] transition-colors p-1"
-                  >
-                    <FaEllipsisV className="text-xs" />
-                  </button>
-
-                  {activeMenuId === course.code && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                      <div className="absolute right-0 bottom-8 bg-white border border-[#c3c6d7]/40 shadow-xl rounded-xl py-1 w-32 text-left z-20">
-                        <button 
-                          onClick={() => handleDeleteCourse(course.code)}
-                          className="w-full px-3 py-2 text-[11px] font-bold text-red-600 hover:bg-red-50 flex items-center gap-2 transition-all"
-                        >
-                          <FaTrashAlt /> <span>Delete Entry</span>
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* Featured Bento Row Layout Matrix Injection */}
-            {featuredCourses.map((fCourse) => (
-              <div key={fCourse.code} className="bg-[#e6eeff]/60 rounded-2xl p-6 border border-[#c3c6d7]/50 flex flex-col md:flex-row gap-6 lg:col-span-2 relative overflow-hidden group">
-                <div className="flex-1 flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-start mb-3">
-                      <span className="text-[11px] font-bold text-[#004ac6] bg-[#dbe1ff] px-3 py-1 rounded-lg">{fCourse.code}</span>
-                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide ${fCourse.isFull ? 'bg-red-100 text-[#ba1a1a]' : 'bg-emerald-100 text-[#006242]'}`}>{fCourse.status}</span>
-                    </div>
-                    <h3 className="text-lg font-black text-[#0d1c2f] mb-1.5 group-hover:text-[#004ac6] transition-colors cursor-pointer">
-                      {fCourse.title}
-                    </h3>
-                    <p className="text-xs text-[#434655] leading-relaxed line-clamp-2">
-                      {fCourse.description || "Exploration of system principles matching corporate operational structures."}
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center gap-3 mt-4 justify-between">
-                    <div className="flex items-center gap-2">
-                      <img className="w-7 h-7 rounded-full object-cover border-2 border-white" src={fCourse.avatar} alt="Prof" />
-                      <span className="text-xs font-bold text-[#434655]">{fCourse.instructor}</span>
-                    </div>
-                    <button 
-                      onClick={() => handleDeleteCourse(fCourse.code)}
-                      className="text-[#737686] hover:text-red-600 text-xs font-semibold flex items-center gap-1 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
-                    >
-                      <FaTrashAlt /> Remove
-                    </button>
-                  </div>
-                </div>
-
-                <div className="md:w-48 bg-white rounded-xl p-4 flex flex-col justify-center border border-[#c3c6d7]/30 shadow-sm">
-                  <div className="text-center mb-3">
-                    <p className="text-[10px] font-bold text-[#434655] uppercase tracking-wider">Current Status</p>
-                    <p className="text-3xl font-black text-[#004ac6] mt-0.5">{fCourse.pct}%</p>
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[10px] font-bold">
-                      <span className="text-[#0d1c2f]">{fCourse.enrolled}/{fCourse.max} Filled</span>
-                      <span className="text-[#505f76]">{fCourse.credits} Credits</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-[#f8f9ff] rounded-full overflow-hidden">
-                      <div className={`h-full ${fCourse.isFull ? 'bg-red-600' : 'bg-[#004ac6]'}`} style={{ width: `${fCourse.pct}%` }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </>
-        ) : (
-          <div className="col-span-full text-center py-12 text-xs font-bold text-[#434655]">No course programs match your current filter selections.</div>
-        )}
-      </div>
-
-      {/* 5. Pagination Control Footer */}
-      <div className="pt-4 flex items-center justify-between border-t border-[#c3c6d7]/20">
-        <p className="text-xs font-semibold text-[#434655]">
-          Showing {standardCourses.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}-
-          {Math.min(currentPage * itemsPerPage, standardCourses.length)} of {standardCourses.length} programs
-        </p>
-        <div className="flex items-center gap-1">
-          <button 
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage(prev => prev - 1)}
-            className="w-8 h-8 flex items-center justify-center rounded-xl border border-[#c3c6d7] text-[#737686] disabled:opacity-30"
-          >
-            <FaChevronLeft className="text-xs" />
-          </button>
-          <span className="text-xs font-bold text-[#0d1c2f] px-2">Page {currentPage} of {totalPages}</span>
-          <button 
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage(prev => prev + 1)}
-            className="w-8 h-8 flex items-center justify-center rounded-xl border border-[#c3c6d7] text-[#737686] disabled:opacity-30"
-          >
-            <FaChevronRight className="text-xs" />
-          </button>
-        </div>
-      </div>
-
-      {/* Program Registration Entry Overlay Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl border border-[#c3c6d7]/50 shadow-2xl max-w-md w-full p-6 relative">
-            <button onClick={() => setIsModalOpen(false)} className="absolute right-4 top-4 text-[#434655]/50 hover:text-[#0d1c2f]"><FaTimes /></button>
-            <div className="mb-4">
-              <h3 className="text-base font-black text-[#0d1c2f]">Create New Program</h3>
-              <p className="text-[11px] font-medium text-[#434655]">Deploy updated course curriculum pathways into production.</p>
+      {/* ─── PROVISION COURSE CONTROL PANEL ─── */}
+      {showAddForm && (
+        <form onSubmit={handleSubmit} className="bg-white border border-[#c3c6d7]/40 rounded-2xl p-6 space-y-4 shadow-md animate-fadeIn">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Course Target Template</label>
+              <select name="name" value={form.name} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none focus:border-[#004ac6]">
+                {presetPrograms.map(p => <option key={p} value={p}>{p}</option>)}
+                <option value="Custom Track">Custom Track (Define in Description)</option>
+              </select>
             </div>
-            <form onSubmit={handleCreateCourse} className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-1">
-                  <label className="block text-[10px] font-black text-[#434655] uppercase tracking-wider mb-1">Code</label>
-                  <input required type="text" value={formData.code} onChange={(e) => setFormData({...formData, code: e.target.value})} placeholder="CS-101" className="w-full text-xs font-semibold rounded-xl border-[#c3c6d7] bg-[#eff4ff]/20 py-2 px-3 focus:bg-white focus:ring-2 focus:ring-[#004ac6]" />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-[10px] font-black text-[#434655] uppercase tracking-wider mb-1">Course Title</label>
-                  <input required type="text" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} placeholder="Intro to Algorithms" className="w-full text-xs font-semibold rounded-xl border-[#c3c6d7] bg-[#eff4ff]/20 py-2 px-3 focus:bg-white focus:ring-2 focus:ring-[#004ac6]" />
-                </div>
-              </div>
 
-              <div>
-                <label className="block text-[10px] font-black text-[#434655] uppercase tracking-wider mb-1">Assigned Instructor</label>
-                <select value={formData.instructor} onChange={(e) => setFormData({...formData, instructor: e.target.value})} className="w-full text-xs font-bold rounded-xl border-[#c3c6d7] bg-[#eff4ff]/20 py-2 px-3 focus:ring-2 focus:ring-[#004ac6]">
-                  <option>Dr. Sarah Jenkins</option>
-                  <option>Prof. Michael Chen</option>
-                  <option>Elena Rodriguez</option>
-                  <option>Dr. Alan Turing</option>
-                </select>
-              </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Target Age Group Bracket</label>
+              <input type="text" name="ageGroup" value={form.ageGroup} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" placeholder="Ex: 6-10 Years" />
+            </div>
 
-              <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Timeline Duration</label>
+              <input type="text" name="duration" value={form.duration} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" placeholder="Ex: 12 Weeks" />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Fee Valuation ($ / INR) *</label>
+              <input type="number" name="fee" required value={form.fee} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" placeholder="0.00" />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Maximum Student Threshold</label>
+              <input type="number" name="maxStudents" value={form.maxStudents} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Lifecycle Allocation</label>
+              <select name="status" value={form.status} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none"><option value="Active">Active</option><option value="Inactive">Inactive</option></select>
+            </div>
+
+            <div className="space-y-1 md:col-span-3"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Description & Core Focus</label><textarea name="description" value={form.description} onChange={handleInputChange} rows={2} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none resize-none" placeholder="Elaborate curriculum blueprints..." /></div>
+            <div className="space-y-1 md:col-span-3"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Required Faculty Prerequisites / Skills</label><input type="text" name="requiredTeacherSkills" value={form.requiredTeacherSkills} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" placeholder="Ex: Basic Python, Pygame library vectors" /></div>
+            <div className="space-y-1 md:col-span-3"><label className="text-[10px] font-black text-[#434655] uppercase tracking-wider">Allocated Course Materials & Resources</label><input type="text" name="courseMaterial" value={form.courseMaterial} onChange={handleInputChange} className="w-full px-3 py-2 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-xs font-medium focus:outline-none" placeholder="Ex: Kit Box v1, Textbook Vol 3 Link" /></div>
+          </div>
+
+          <button type="submit" disabled={isLoading} className="w-full bg-[#004ac6] text-white font-bold text-xs py-3 rounded-xl hover:bg-[#2563eb] transition-all flex items-center justify-center gap-2">
+            {isLoading ? <><FaSpinner className="animate-spin" /> Structuring Elements...</> : "Commit New Course Stream"}
+          </button>
+        </form>
+      )}
+
+      {/* ─── SYSTEM LEDGER MATRIX DISPLAY ─── */}
+      <div className="bg-white border border-[#c3c6d7]/30 rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-[#c3c6d7]/10 bg-[#f8f9ff]"><h2 className="text-xs font-black text-[#0d1c2f] uppercase tracking-wider">Active Curriculum Catalogs</h2></div>
+        <div className="overflow-x-auto">
+          {isFetching ? (
+            <div className="text-center py-12 text-xs font-bold text-[#434655]/60 flex items-center justify-center gap-2"><FaSpinner className="animate-spin text-[#004ac6]" /> Building active syllabus indexes...</div>
+          ) : coursesList.length === 0 ? (
+            <div className="text-center py-12 text-xs font-bold text-[#434655]/60">No curriculum profiles defined inside this database branch.</div>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#f8f9ff] border-b border-[#c3c6d7]/20">
+                  <th className="p-4 text-[10px] font-black text-[#434655] uppercase tracking-wider">Course ID</th>
+                  <th className="p-4 text-[10px] font-black text-[#434655] uppercase tracking-wider">Program Scope</th>
+                  <th className="p-4 text-[10px] font-black text-[#434655] uppercase tracking-wider">Age Group Matrix</th>
+                  <th className="p-4 text-[10px] font-black text-[#434655] uppercase tracking-wider">Base Cost / Fee</th>
+                  <th className="p-4 text-[10px] font-black text-[#434655] uppercase tracking-wider">Seat Capacity</th>
+                  <th className="p-4 text-[10px] font-black text-[#434655] uppercase tracking-wider text-right">Action Map</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#c3c6d7]/10">
+                {coursesList.map((course) => (
+                  <tr key={course.id} className="hover:bg-[#f8f9ff]/40 transition-colors">
+                    <td className="p-4 text-xs font-bold text-[#004ac6]">{course.course_code}</td>
+                    <td className="p-4 text-xs font-black text-[#0d1c2f]">{course.name}</td>
+                    <td className="p-4 text-xs font-semibold text-[#434655]">{course.age_group}</td>
+                    <td className="p-4 text-xs font-black text-emerald-700">${course.fee}</td>
+                    <td className="p-4 text-xs font-bold text-[#434655]">{course.max_students} Max Seats</td>
+                    <td className="p-4 text-right">
+                      <button onClick={() => setSelectedCourse(course)} className="px-3 py-1.5 bg-[#f8f9ff] border border-[#c3c6d7]/40 rounded-xl text-[11px] font-black text-[#0d1c2f] inline-flex items-center gap-1.5 shadow-sm hover:bg-[#004ac6] hover:text-white transition-all">
+                        <FaEye /> Full Blueprint <FaChevronRight className="text-[9px]" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* ─── BLUEPRINT COMPONENT VIEW SHEET MODAL ─── */}
+      {selectedCourse && (
+        <div className="fixed inset-0 bg-[#0d1c2f]/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl w-full max-w-3xl border border-[#c3c6d7]/40 shadow-2xl flex flex-col">
+            
+            <div className="p-5 border-b border-[#c3c6d7]/10 flex items-center justify-between bg-[#f8f9ff]">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#004ac6] text-white flex items-center justify-center text-xs"><FaBookOpen /></div>
                 <div>
-                  <label className="block text-[10px] font-black text-[#434655] uppercase tracking-wider mb-1">Department</label>
-                  <select value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="w-full text-xs font-bold rounded-xl border-[#c3c6d7] bg-[#eff4ff]/20 py-2 px-3 focus:ring-2 focus:ring-[#004ac6]">
-                    <option value="Mathematics">Mathematics</option>
-                    <option value="Computer Science">Computer Science</option>
-                    <option value="Business">Business</option>
-                    <option value="Design">Design</option>
-                  </select>
+                  <h3 className="text-sm font-black text-[#0d1c2f]">{selectedCourse.name} Profile Map</h3>
+                  <p className="text-[10px] font-bold text-[#004ac6] uppercase tracking-wider">Course Reference Block: {selectedCourse.course_code}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedCourse(null)} className="w-8 h-8 rounded-xl bg-white border border-[#c3c6d7]/40 flex items-center justify-center text-xs text-[#434655] hover:bg-rose-50 hover:text-rose-600 transition-colors shadow-sm"><FaXmark /></button>
+            </div>
+
+            <div className="p-6 space-y-5 text-xs font-semibold text-[#434655]">
+              <div className="bg-[#f8f9ff] p-4 rounded-xl border border-[#c3c6d7]/20">
+                <p className="text-[9px] uppercase tracking-wide font-black text-[#737686] mb-0.5">Description Framework</p>
+                <p className="text-[#0d1c2f] leading-relaxed">{selectedCourse.description || "No core descriptive overview listed for this target program node."}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div><p className="text-[9px] uppercase tracking-wide font-black text-[#737686] flex items-center gap-1"><FaUsersGear /> Age Bracket</p><p className="text-[#0d1c2f] font-bold mt-0.5">{selectedCourse.age_group}</p></div>
+                <div><p className="text-[9px] uppercase tracking-wide font-black text-[#737686]">Timeline Duration</p><p className="text-[#0d1c2f] font-bold mt-0.5">{selectedCourse.duration}</p></div>
+                <div><p className="text-[9px] uppercase tracking-wide font-black text-[#737686] flex items-center gap-1"><FaDollarSign /> Base Rate Cost</p><p className="text-emerald-700 font-black mt-0.5">${selectedCourse.fee}</p></div>
+                <div><p className="text-[9px] uppercase tracking-wide font-black text-[#737686]">Max Classroom Threshold</p><p className="text-[#0d1c2f] font-bold mt-0.5">{selectedCourse.max_students} Enrollment Seats</p></div>
+              </div>
+
+              <div className="border-t border-[#c3c6d7]/10 pt-4 space-y-3">
+                <div>
+                  <p className="text-[9px] uppercase tracking-wide font-black text-[#737686] flex items-center gap-1"><FaGraduationCap /> Desired Instructor Core Skills</p>
+                  <p className="text-[#0d1c2f] font-bold mt-0.5">{selectedCourse.required_teacher_skills || "All General Faculty Approved"}</p>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-[#434655] uppercase tracking-wider mb-1">Credits</label>
-                  <input type="number" min={1} max={5} value={formData.credits} onChange={(e) => setFormData({...formData, credits: Number(e.target.value)})} className="w-full text-xs font-semibold rounded-xl border-[#c3c6d7] bg-[#eff4ff]/20 py-2 px-3 focus:bg-white focus:ring-2 focus:ring-[#004ac6]" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-[#434655] uppercase tracking-wider mb-1">Max Cap</label>
-                  <input type="number" min={5} max={100} value={formData.max} onChange={(e) => setFormData({...formData, max: Number(e.target.value)})} className="w-full text-xs font-semibold rounded-xl border-[#c3c6d7] bg-[#eff4ff]/20 py-2 px-3 focus:bg-white focus:ring-2 focus:ring-[#004ac6]" />
+                  <p className="text-[9px] uppercase tracking-wide font-black text-[#737686]">Approved Study Material / Kits</p>
+                  <p className="text-[#004ac6] font-bold mt-0.5">{selectedCourse.course_material || "Standard digital syllabus link references"}</p>
                 </div>
               </div>
+            </div>
 
-              <div>
-                <label className="block text-[10px] font-black text-[#434655] uppercase tracking-wider mb-1">Description (Required for Feature Highlights)</label>
-                <textarea rows={2} value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} placeholder="Brief breakdown of core curriculum metrics..." className="w-full text-xs font-semibold rounded-xl border-[#c3c6d7] bg-[#eff4ff]/20 py-2 px-3 focus:bg-white focus:ring-2 focus:ring-[#004ac6]" />
-              </div>
-
-              <div className="flex items-center gap-2 py-1">
-                <input type="checkbox" id="isFeatured" checked={formData.isFeatured} onChange={(e) => setFormData({...formData, isFeatured: e.target.checked})} className="rounded text-[#004ac6] focus:ring-[#004ac6] w-4 h-4 cursor-pointer" />
-                <label htmlFor="isFeatured" className="text-xs font-bold text-[#0d1c2f] cursor-pointer selection:bg-transparent">Promote as Featured Large Bento Card</label>
-              </div>
-
-              <div className="flex gap-3 justify-end pt-2">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2.5 rounded-xl border border-[#c3c6d7] text-[#434655] font-bold text-xs hover:bg-[#eff4ff]/40">Cancel</button>
-                <button type="submit" className="px-4 py-2.5 rounded-xl bg-[#004ac6] hover:bg-[#2563eb] text-white font-bold text-xs shadow-sm">Save Program</button>
-              </div>
-            </form>
           </div>
         </div>
       )}
+
     </div>
   );
 }
