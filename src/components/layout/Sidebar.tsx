@@ -37,7 +37,7 @@ export default function Sidebar({ onLogout }: SidebarProps) {
         {/* ─── SYSTEM BRAND LOGO HEADER (ENLARGED) ─── */}
         <div className="px-2 py-4 flex flex-col items-center justify-center border-b border-[#c3c6d7]/10 bg-[#f8f9ff]/40 rounded-xl mb-2">
           <img 
-            src="/Topgrade@123.png" 
+            src="/logo.png" 
             alt="Top Grade Learning Official Logo" 
             className="h-18 max-h-24 w-auto object-contain drop-shadow-sm mb-2" 
             onError={(e) => {
