@@ -34,12 +34,12 @@ export default function Sidebar({ onLogout }: SidebarProps) {
     <aside className="w-64 fixed left-0 top-0 h-screen bg-white border-r border-[#c3c6d7]/40 p-4 flex flex-col justify-between z-20">
       <div className="space-y-6">
         
-        {/* ─── SYSTEM BRAND LOGO HEADER (ENLARGED) ─── */}
+        {/* ─── SYSTEM BRAND LOGO HEADER ─── */}
         <div className="px-2 py-4 flex flex-col items-center justify-center border-b border-[#c3c6d7]/10 bg-[#f8f9ff]/40 rounded-xl mb-2">
           <img 
             src="/logo.png" 
             alt="Top Grade Learning Official Logo" 
-            className="h-20 max-h-24 w-auto object-contain drop-shadow-sm mb-2" 
+            className="h-20 max-h-24 w-auto object-contain p-1.5 bg-white border border-slate-900 rounded-lg shadow-sm mb-2" 
             onError={(e) => {
               (e.target as HTMLImageElement).src = "./logo.png";
             }}
