@@ -38,11 +38,11 @@ export default function Sidebar({ onLogout }: SidebarProps) {
         <div className="px-2 py-4 flex flex-col items-center justify-center border-b border-[#c3c6d7]/10 bg-[#f8f9ff]/40 rounded-xl mb-2">
           <div className="w-full aspect-square max-w-[160px] p-4 bg-gradient-to-br from-slate-50 to-[#eff4ff] border border-slate-900 rounded-2xl shadow-sm flex items-center justify-center mb-2">
             <img 
-              src="/logo.png" 
+              src="/logo1.png" 
               alt="Top Grade Learning Official Logo" 
               className="w-full h-auto object-contain drop-shadow-sm" 
               onError={(e) => {
-                (e.target as HTMLImageElement).src = "./logo.png";
+                (e.target as HTMLImageElement).src = "./logo1.png";
               }}
             />
           </div>
