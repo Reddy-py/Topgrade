@@ -10,13 +10,13 @@ import {
   FaChalkboardUser, 
   FaBook, 
   FaCakeCandles, 
+  FaClockRotateLeft, 
   FaBell,
   FaCalendar,
   FaWallet,
   FaFileInvoice,
   FaEnvelope
-} from "react-icons/fa6"; // Using modern react-icons elements
-import { FaCalendarAlt, FaChalkboardTeacher, FaHistory } from "react-icons/fa";
+} from "react-icons/fa6";
 
 export default function Dashboard() {
   const [backendData, setBackendData] = useState<any>(null);
@@ -44,15 +44,40 @@ export default function Dashboard() {
       .then((res) => res.json())
       .then((data) => {
         setBackendData(data);
-        // When backend database sync aggregation is ready, it overrides these live states:
+        const syncedAt = new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+        setNotifications([
+          {
+            message: `${data.systemName || "Institution"} synced successfully`,
+            timestamp: syncedAt,
+          },
+          ...(data.status
+            ? [{ message: `System status: ${data.status}`, timestamp: syncedAt }]
+            : []),
+        ]);
+
         if (data.liveMetrics) {
           setMetrics(data.liveMetrics);
         }
       })
-      .catch((err) => console.error("Error syncing operational data matrix:", err));
+      .catch((err) => {
+        console.error("Error syncing operational data matrix:", err);
+        setNotifications([
+          {
+            message: "Backend sync failed. Please verify connectivity.",
+            timestamp: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          },
+        ]);
+      });
   }, []);
 
-  // Quick Action Handler Route Router Links (Placeholders for upcoming feature branches)
+  // Quick Action Handler Route Router Links
   const handleQuickAction = (actionName: string) => {
     console.log(`Navigation routing context triggered for system module: ${actionName}`);
     alert(`Redirecting to live system page for: ${actionName}`);
@@ -92,12 +117,12 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs font-bold text-[#434655] bg-white px-3 py-1.5 rounded-xl border border-[#c3c6d7]/30 shadow-sm self-start sm:self-auto">
-          <FaCalendarAlt className="text-[#004ac6]" />
+          <FaCalendar className="text-[#004ac6]" />
           <span>Live Operations Workspace</span>
         </div>
       </div>
 
-      {/* ─── SENIOR TEAM SPECIFIED WIDGET MATRIX ─── */}
+      {/* ─── WIDGET MATRIX ─── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         
         {/* Widget 1: Total Students */}
@@ -160,7 +185,7 @@ export default function Dashboard() {
             <p className="text-[9px] font-bold text-[#737686] uppercase tracking-wider">Teachers Online</p>
             <p className="text-xl font-black text-[#0d1c2f]">{metrics.teachersAvailable}</p>
           </div>
-          <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center text-sm"><FaChalkboardTeacher /></div>
+          <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center text-sm"><FaChalkboardUser /></div>
         </div>
 
         {/* Widget 8: Active Courses */}
@@ -187,7 +212,7 @@ export default function Dashboard() {
             <p className="text-[9px] font-bold text-[#737686] uppercase tracking-wider">Renewals Due</p>
             <p className="text-xl font-black text-amber-600">{metrics.upcomingRenewals}</p>
           </div>
-          <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center text-sm"><FaHistory /></div>
+          <div className="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-600 flex items-center justify-center text-sm"><FaClockRotateLeft /></div>
         </div>
 
       </div>
@@ -217,7 +242,7 @@ export default function Dashboard() {
                 <span className="text-[11px] font-black text-[#0d1c2f]">Mark Attendance</span>
               </button>
               <button onClick={() => handleQuickAction("Add Teacher")} className="flex flex-col items-center justify-center p-4 bg-[#f8f9ff] border border-[#c3c6d7]/20 rounded-xl hover:border-amber-600 hover:bg-amber-50/50 transition-all group text-center gap-2">
-                <FaChalkboardTeacher className="text-lg text-amber-600 group-hover:scale-110 transition-transform" />
+                <FaChalkboardUser className="text-lg text-amber-600 group-hover:scale-110 transition-transform" />
                 <span className="text-[11px] font-black text-[#0d1c2f]">Add Teacher</span>
               </button>
               <button onClick={() => handleQuickAction("Create Schedule")} className="flex flex-col items-center justify-center p-4 bg-[#f8f9ff] border border-[#c3c6d7]/20 rounded-xl hover:border-blue-500 hover:bg-blue-50/50 transition-all group text-center gap-2">
@@ -236,7 +261,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Right Column Area: Senior Requested Notifications Box */}
+        {/* Right Column Area: Notifications Box */}
         <div className="space-y-6">
           <div className="bg-white p-5 rounded-2xl border border-[#c3c6d7]/30 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-[#c3c6d7]/10 pb-3">
